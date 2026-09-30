@@ -1,0 +1,10 @@
+{
+  "name": "final try to home aap ana hi yahi tak",
+  "description": "STYLE 1 is a modern Indian fashion and garment e-commerce platform with customer shopping, OTP login, cart, checkout with COD, and comprehensive admin dashboard.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
