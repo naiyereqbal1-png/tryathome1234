@@ -14,6 +14,10 @@ import {
   Phone,
   Mail,
   MapPin,
+  RefreshCw,
+  AlertCircle,
+  ShieldCheck,
+  X,
 } from 'lucide-react';
 import { TryAtHomeCountdown } from '../order/TryAtHomeCountdown';
 import { printInvoiceElement, downloadInvoicePDF } from '../../utils/printInvoice';
@@ -34,6 +38,57 @@ export const OrderInvoiceModal: React.FC<OrderInvoiceModalProps> = ({
   const [currentOrder, setCurrentOrder] = useState<Order | null>(order);
   const [justGenerated, setJustGenerated] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+
+  // Admin Re-open OTP Modal State
+  const [showReopenOtpModal, setShowReopenOtpModal] = useState(false);
+  const [sentOtpCode, setSentOtpCode] = useState('');
+  const [inputOtp, setInputOtp] = useState('');
+  const [otpErrorMsg, setOtpErrorMsg] = useState('');
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [adminMobile, setAdminMobile] = useState('');
+
+  const handleInitiateReopenWithOtp = () => {
+    const currentAdmin = db.getCurrentAdmin();
+    const targetMobile = currentAdmin?.mobile || '9876543210';
+    setAdminMobile(targetMobile);
+
+    const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    setSentOtpCode(generatedOtp);
+    db.sendOtp(targetMobile);
+
+    setInputOtp('');
+    setOtpErrorMsg('');
+    setShowReopenOtpModal(true);
+  };
+
+  const handleVerifyOtpAndReopen = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setOtpErrorMsg('');
+
+    if (!inputOtp || inputOtp.trim().length !== 6) {
+      setOtpErrorMsg('Please enter a valid 6-digit OTP code.');
+      return;
+    }
+
+    if (inputOtp.trim() !== sentOtpCode.trim()) {
+      setOtpErrorMsg('Invalid Admin OTP code! Please check the code and try again.');
+      return;
+    }
+
+    try {
+      setIsVerifyingOtp(true);
+      const updated = db.reopenOrder(currentOrder.order_id, userRole || 'Admin');
+      setCurrentOrder(updated);
+      setShowReopenOtpModal(false);
+      if (onBillGenerated) {
+        onBillGenerated(updated);
+      }
+    } catch (err: any) {
+      setOtpErrorMsg(err.message || 'Failed to re-open order.');
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  };
 
   React.useEffect(() => {
     setCurrentOrder(order);
@@ -603,10 +658,22 @@ export const OrderInvoiceModal: React.FC<OrderInvoiceModalProps> = ({
                 <span>Generate & Lock Final Bill</span>
               </button>
             ) : (
-              <span className="text-xs text-amber-800 font-bold flex items-center gap-1.5 bg-amber-100/70 border border-amber-300 px-3 py-1.5 rounded-xl">
-                <Lock className="w-3.5 h-3.5 text-amber-700" />
-                <span>Final Bill & Invoice Locked</span>
-              </span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-amber-800 font-bold flex items-center gap-1.5 bg-amber-100/70 border border-amber-300 px-3 py-1.5 rounded-xl">
+                  <Lock className="w-3.5 h-3.5 text-amber-700" />
+                  <span>Final Bill & Invoice Locked</span>
+                </span>
+                {userRole === 'Admin' && (
+                  <button
+                    type="button"
+                    onClick={handleInitiateReopenWithOtp}
+                    className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-amber-600"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 text-slate-900" />
+                    <span>Re-open Order (Admin OTP)</span>
+                  </button>
+                )}
+              </div>
             )}
           </div>
 
@@ -637,6 +704,114 @@ export const OrderInvoiceModal: React.FC<OrderInvoiceModalProps> = ({
           </div>
         </div>
       </div>
+
+      {/* ADMIN RE-OPEN ORDER OTP AUTHORIZATION MODAL */}
+      {showReopenOtpModal && (
+        <div className="fixed inset-0 z-70 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in">
+          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
+            {/* Modal Header */}
+            <div className="px-6 py-5 bg-slate-900 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30">
+                  <Lock className="w-5 h-5 text-amber-400" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base leading-tight">Admin OTP Verification</h3>
+                  <p className="text-[11px] text-slate-400">Security Authorization for Order Re-open</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowReopenOtpModal(false)}
+                className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <form onSubmit={handleVerifyOtpAndReopen} className="p-6 space-y-5">
+              <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl text-xs space-y-1">
+                <p className="font-black text-amber-900 flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-amber-600" />
+                  Authorization Required: Order #{currentOrder.order_id}
+                </p>
+                <p className="text-amber-800 text-[11px] leading-relaxed">
+                  Unlocking this bill allows customer to re-submit final billing. An OTP code has been dispatched to Admin mobile <strong>+91 {adminMobile}</strong>.
+                </p>
+              </div>
+
+              {/* Security OTP Banner */}
+              <div className="p-3.5 bg-indigo-50 border border-indigo-200 rounded-2xl text-center space-y-1">
+                <span className="text-[10px] font-extrabold uppercase text-indigo-700 tracking-wider block">
+                  🔑 Admin Security Authorization OTP Code
+                </span>
+                <span className="text-2xl font-black font-mono tracking-widest text-indigo-950 block">
+                  {sentOtpCode}
+                </span>
+                <p className="text-[10px] text-indigo-600 font-medium">
+                  Enter this 6-digit OTP code below to confirm order re-opening
+                </p>
+              </div>
+
+              <div>
+                <label className="text-xs font-extrabold text-slate-800 block mb-1.5">
+                  Enter 6-Digit Admin OTP
+                </label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  autoFocus
+                  value={inputOtp}
+                  onChange={(e) => setInputOtp(e.target.value.replace(/\D/g, ''))}
+                  placeholder="e.g. 123456"
+                  className="w-full text-center text-2xl font-black font-mono tracking-widest py-3 px-4 bg-slate-50 border-2 border-slate-300 focus:border-indigo-600 rounded-2xl outline-hidden transition-all text-slate-900"
+                />
+              </div>
+
+              {otpErrorMsg && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs font-bold text-rose-700 flex items-center gap-1.5">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                  <span>{otpErrorMsg}</span>
+                </div>
+              )}
+
+              <div className="pt-2 flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
+                    setSentOtpCode(newOtp);
+                    db.sendOtp(adminMobile);
+                    setOtpErrorMsg('');
+                  }}
+                  className="text-xs font-bold text-indigo-600 hover:text-indigo-800 underline cursor-pointer"
+                >
+                  Resend OTP
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowReopenOtpModal(false)}
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isVerifyingOtp || inputOtp.length !== 6}
+                    className="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black rounded-xl shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${isVerifyingOtp ? 'animate-spin' : ''}`} />
+                    <span>{isVerifyingOtp ? 'Verifying...' : 'Verify OTP & Unlock Order'}</span>
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

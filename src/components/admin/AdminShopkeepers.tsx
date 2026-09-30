@@ -25,15 +25,25 @@ import {
   DollarSign,
   Layers,
   Image as ImageIcon,
+  User,
+  Phone,
+  FileText,
+  Truck,
+  Calendar,
+  MapPin,
+  CreditCard,
+  Package,
 } from 'lucide-react';
 import { db } from '../../services/db';
-import { Shopkeeper, ShopkeeperPermissions, Product, StockTransaction } from '../../types';
+import { Shopkeeper, ShopkeeperPermissions, Product, StockTransaction, Order } from '../../types';
 
 export const AdminShopkeepers: React.FC = () => {
   const [activeSubTab, setActiveSubTab] = useState<'PARTNERS' | 'APPROVALS' | 'TRANSACTIONS'>('PARTNERS');
   const [shopkeepers, setShopkeepers] = useState<Shopkeeper[]>(db.getShopkeepers());
   const [allProducts, setAllProducts] = useState<Product[]>(db.getAllProducts());
   const [transactions, setTransactions] = useState<StockTransaction[]>(db.getStockTransactions());
+  const [allOrders, setAllOrders] = useState<Order[]>(db.getOrders());
+  const [ledgerViewMode, setLedgerViewMode] = useState<'ORDERS' | 'INVENTORY'>('ORDERS');
 
   // Search & Filter states
   const [searchQuery, setSearchQuery] = useState('');
@@ -93,6 +103,7 @@ export const AdminShopkeepers: React.FC = () => {
     setShopkeepers(db.getShopkeepers());
     setAllProducts(db.getAllProducts());
     setTransactions(db.getStockTransactions());
+    setAllOrders(db.getOrders());
   };
 
   useEffect(() => {
@@ -481,25 +492,68 @@ export const AdminShopkeepers: React.FC = () => {
                 return true;
               });
 
+              // Compute order stats for this specific partner
+              const partnerOrderItems: Array<{ order: Order; item: any }> = [];
+              allOrders.forEach((ord) => {
+                (ord.items || []).forEach((item) => {
+                  let matches = false;
+                  if (item.shopkeeper_id && validIds.has(item.shopkeeper_id)) {
+                    matches = true;
+                  } else if (item.shopkeeper_name && (
+                    item.shopkeeper_name.toLowerCase() === selectedPartnerForProducts.name.toLowerCase() ||
+                    (selectedPartnerForProducts.store_name && item.shopkeeper_name.toLowerCase() === selectedPartnerForProducts.store_name.toLowerCase())
+                  )) {
+                    matches = true;
+                  } else if (partnerProducts.some((p) => p.id === item.product_id)) {
+                    matches = true;
+                  }
+
+                  if (matches) {
+                    partnerOrderItems.push({ order: ord, item });
+                  }
+                });
+              });
+
+              const deliveredOrderItems = partnerOrderItems.filter((m) => m.order.order_status === 'Delivered');
+              const cancelledOrderItems = partnerOrderItems.filter((m) => m.order.order_status === 'Cancelled');
+              const inProgressOrderItems = partnerOrderItems.filter((m) => m.order.order_status !== 'Delivered' && m.order.order_status !== 'Cancelled');
+
+              const totalDeliveredOrdersCount = new Set(deliveredOrderItems.map((m) => m.order.order_id)).size;
+              const totalCancelledOrdersCount = new Set(cancelledOrderItems.map((m) => m.order.order_id)).size;
+              const totalInProgressOrdersCount = new Set(inProgressOrderItems.map((m) => m.order.order_id)).size;
+
               return (
                 <div className="space-y-4">
-                  {/* Summary Metric Cards */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
-                      <div className="text-[10px] font-bold uppercase text-slate-400">Total Products</div>
-                      <div className="text-xl font-black text-slate-900 mt-0.5">{partnerProducts.length}</div>
+                  {/* Comprehensive Partner Performance & Metric Cards */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                    <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs">
+                      <div className="text-[10px] font-extrabold uppercase text-slate-400">Total Products</div>
+                      <div className="text-lg font-black text-slate-900 mt-0.5">{partnerProducts.length} <span className="text-xs font-normal text-slate-500">Items</span></div>
                     </div>
-                    <div className="bg-emerald-50/60 p-4 rounded-xl border border-emerald-200/70 shadow-2xs">
-                      <div className="text-[10px] font-bold uppercase text-emerald-700">Live & Catalog Active</div>
-                      <div className="text-xl font-black text-emerald-800 mt-0.5">{liveCount}</div>
+
+                    <div className="bg-emerald-50/80 p-3.5 rounded-2xl border border-emerald-200 shadow-2xs">
+                      <div className="text-[10px] font-extrabold uppercase text-emerald-800">Delivered Orders</div>
+                      <div className="text-lg font-black text-emerald-900 mt-0.5">{totalDeliveredOrdersCount} <span className="text-xs font-normal text-emerald-700">Orders</span></div>
                     </div>
-                    <div className="bg-amber-50/60 p-4 rounded-xl border border-amber-200/70 shadow-2xs">
-                      <div className="text-[10px] font-bold uppercase text-amber-700">Pending Review</div>
-                      <div className="text-xl font-black text-amber-800 mt-0.5">{pendingCount}</div>
+
+                    <div className="bg-rose-50/80 p-3.5 rounded-2xl border border-rose-200 shadow-2xs">
+                      <div className="text-[10px] font-extrabold uppercase text-rose-800">Cancelled Orders</div>
+                      <div className="text-lg font-black text-rose-900 mt-0.5">{totalCancelledOrdersCount} <span className="text-xs font-normal text-rose-700">Orders</span></div>
                     </div>
-                    <div className="bg-indigo-50/60 p-4 rounded-xl border border-indigo-200/70 shadow-2xs">
-                      <div className="text-[10px] font-bold uppercase text-indigo-700">In-Stock Units</div>
-                      <div className="text-xl font-black text-indigo-900 mt-0.5">{totalStock}</div>
+
+                    <div className="bg-amber-50/80 p-3.5 rounded-2xl border border-amber-200 shadow-2xs">
+                      <div className="text-[10px] font-extrabold uppercase text-amber-800">In-Progress Orders</div>
+                      <div className="text-lg font-black text-amber-900 mt-0.5">{totalInProgressOrdersCount} <span className="text-xs font-normal text-amber-700">Orders</span></div>
+                    </div>
+
+                    <div className="bg-indigo-50/80 p-3.5 rounded-2xl border border-indigo-200 shadow-2xs">
+                      <div className="text-[10px] font-extrabold uppercase text-indigo-800">Live Catalog</div>
+                      <div className="text-lg font-black text-indigo-900 mt-0.5">{liveCount} <span className="text-xs font-normal text-indigo-700">Active</span></div>
+                    </div>
+
+                    <div className="bg-slate-900 text-white p-3.5 rounded-2xl shadow-2xs flex flex-col justify-between">
+                      <div className="text-[10px] font-extrabold uppercase text-amber-400">Stock Units</div>
+                      <div className="text-lg font-black text-white mt-0.5">{totalStock} <span className="text-xs font-normal text-slate-300">In Stock</span></div>
                     </div>
                   </div>
 
@@ -944,107 +998,408 @@ export const AdminShopkeepers: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 3: STOCK MOVEMENT LEDGER */}
-      {activeSubTab === 'TRANSACTIONS' && (
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200">
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-bold text-slate-600">Filter by Merchant:</label>
-              <select
-                value={selectedShopkeeperId}
-                onChange={(e) => setSelectedShopkeeperId(e.target.value)}
-                className="bg-slate-50 border border-slate-200 text-xs font-semibold rounded-lg px-3 py-1.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
+      {/* TAB 3: SHOPKEEPER STOCK MOVEMENT LEDGER & CONFIRMED/DELIVERED ORDERS */}
+      {activeSubTab === 'TRANSACTIONS' && (() => {
+        const currentShopkeeper = shopkeepers.find(
+          (s) => s.id === selectedShopkeeperId || s.shopkeeper_id === selectedShopkeeperId
+        );
+
+        // Extract products for selected shopkeeper
+        const shopProductIds = new Set(
+          allProducts
+            .filter((p) => {
+              if (selectedShopkeeperId === 'ALL' || !currentShopkeeper) return true;
+              if (p.shopkeeper_id && (p.shopkeeper_id === currentShopkeeper.id || p.shopkeeper_id === currentShopkeeper.shopkeeper_id)) return true;
+              if (p.shopkeeper_name && (
+                p.shopkeeper_name.toLowerCase() === currentShopkeeper.name.toLowerCase() ||
+                (currentShopkeeper.store_name && p.shopkeeper_name.toLowerCase() === currentShopkeeper.store_name.toLowerCase())
+              )) return true;
+              return false;
+            })
+            .map((p) => p.id)
+        );
+
+        // Collect order movements for selected shopkeeper
+        const orderMovements: Array<{
+          order: Order;
+          item: any;
+          product?: Product;
+          shopkeeperName: string;
+        }> = [];
+
+        allOrders.forEach((ord) => {
+          (ord.items || []).forEach((item) => {
+            let isMatch = false;
+            let shopName = item.shopkeeper_name || 'Partner Merchant';
+
+            if (selectedShopkeeperId === 'ALL') {
+              isMatch = true;
+            } else if (currentShopkeeper) {
+              if (item.shopkeeper_id && (item.shopkeeper_id === currentShopkeeper.id || item.shopkeeper_id === currentShopkeeper.shopkeeper_id)) {
+                isMatch = true;
+                shopName = currentShopkeeper.store_name || currentShopkeeper.name;
+              } else if (item.shopkeeper_name && (
+                item.shopkeeper_name.toLowerCase() === currentShopkeeper.name.toLowerCase() ||
+                (currentShopkeeper.store_name && item.shopkeeper_name.toLowerCase() === currentShopkeeper.store_name.toLowerCase())
+              )) {
+                isMatch = true;
+                shopName = currentShopkeeper.store_name || currentShopkeeper.name;
+              } else if (shopProductIds.has(item.product_id)) {
+                isMatch = true;
+                shopName = currentShopkeeper.store_name || currentShopkeeper.name;
+              }
+            }
+
+            if (isMatch) {
+              const prod = allProducts.find((p) => p.id === item.product_id);
+              orderMovements.push({
+                order: ord,
+                item,
+                product: prod,
+                shopkeeperName: shopName || prod?.shopkeeper_name || 'Merchant',
+              });
+            }
+          });
+        });
+
+        // Compute summary metrics for selected shopkeeper
+        const confirmedOrdersList = orderMovements.filter((m) => m.order.order_status !== 'Cancelled');
+        const deliveredOrdersList = orderMovements.filter((m) => m.order.order_status === 'Delivered');
+
+        const uniqueConfirmedOrdersCount = new Set(confirmedOrdersList.map((m) => m.order.order_id)).size;
+        const uniqueDeliveredOrdersCount = new Set(deliveredOrdersList.map((m) => m.order.order_id)).size;
+        const totalDeliveredUnits = deliveredOrdersList.reduce((sum, m) => sum + (m.item.quantity || 1), 0);
+        const totalGrossRevenue = confirmedOrdersList.reduce((sum, m) => sum + ((m.item.price || 0) * (m.item.quantity || 1)), 0);
+
+        return (
+          <div className="space-y-5">
+            {/* Filter Bar & Merchant Selector */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-amber-50 rounded-xl border border-amber-200 text-amber-700">
+                  <Boxes className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-slate-900 text-base">Shopkeeper Stock Movement & Order Ledger</h3>
+                  <p className="text-xs text-slate-500">Track confirmed & delivered stock movements per shopkeeper partner</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-extrabold text-slate-700 shrink-0">Select Merchant Partner:</label>
+                <select
+                  value={selectedShopkeeperId}
+                  onChange={(e) => setSelectedShopkeeperId(e.target.value)}
+                  className="bg-slate-50 border-2 border-slate-200 text-xs font-bold rounded-xl px-3.5 py-2 text-slate-900 focus:outline-none focus:border-amber-500 cursor-pointer"
+                >
+                  <option value="ALL">All Merchants & Partner Stores</option>
+                  {shopkeepers.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.store_name || s.shopkeeper_id})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Selected Shopkeeper Banner Header (if specific merchant selected) */}
+            {currentShopkeeper && (
+              <div className="p-5 bg-gradient-to-r from-amber-500/10 via-amber-50 to-white border border-amber-200 rounded-2xl flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-500 text-slate-950 font-black flex items-center justify-center text-lg shadow-sm">
+                    {currentShopkeeper.name.charAt(0)}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs font-extrabold text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
+                        {currentShopkeeper.shopkeeper_id}
+                      </span>
+                      <span className="text-xs font-black text-slate-900">
+                        {currentShopkeeper.store_name || 'Retail Partner'}
+                      </span>
+                    </div>
+                    <h2 className="text-lg font-black text-slate-900 mt-0.5">{currentShopkeeper.name}</h2>
+                    <p className="text-xs text-slate-600 flex items-center gap-2 flex-wrap">
+                      <span>📞 +91 {currentShopkeeper.mobile}</span>
+                      <span>•</span>
+                      <span>📍 {currentShopkeeper.city || 'India'}</span>
+                      {currentShopkeeper.email && (
+                        <>
+                          <span>•</span>
+                          <span>✉️ {currentShopkeeper.email}</span>
+                        </>
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setSelectedPartnerForProducts(currentShopkeeper)}
+                    className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <ShoppingBag className="w-4 h-4" />
+                    <span>View Catalog ({allProducts.filter(p => p.shopkeeper_id === currentShopkeeper.id || p.shopkeeper_id === currentShopkeeper.shopkeeper_id).length})</span>
+                  </button>
+                  <button
+                    onClick={() => setSelectedShopkeeperId('ALL')}
+                    className="px-3 py-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                  >
+                    Clear Filter
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Merchant Summary KPI Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="p-4 bg-white border border-slate-200 rounded-2xl shadow-2xs">
+                <span className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider block">Confirmed Orders</span>
+                <p className="text-xl font-black text-slate-900 mt-1">{uniqueConfirmedOrdersCount} <span className="text-xs font-normal text-slate-500">Orders</span></p>
+              </div>
+
+              <div className="p-4 bg-emerald-50/50 border border-emerald-200 rounded-2xl shadow-2xs">
+                <span className="text-[10px] font-extrabold uppercase text-emerald-800 tracking-wider block">Delivered Orders</span>
+                <p className="text-xl font-black text-emerald-800 mt-1">{uniqueDeliveredOrdersCount} <span className="text-xs font-normal text-emerald-600">Orders</span></p>
+              </div>
+
+              <div className="p-4 bg-indigo-50/50 border border-indigo-200 rounded-2xl shadow-2xs">
+                <span className="text-[10px] font-extrabold uppercase text-indigo-800 tracking-wider block">Stock Units Delivered</span>
+                <p className="text-xl font-black text-indigo-900 mt-1">{totalDeliveredUnits} <span className="text-xs font-normal text-indigo-600">Pcs</span></p>
+              </div>
+
+              <div className="p-4 bg-amber-50/50 border border-amber-200 rounded-2xl shadow-2xs">
+                <span className="text-[10px] font-extrabold uppercase text-amber-800 tracking-wider block">Gross Sales Volume</span>
+                <p className="text-xl font-black text-amber-900 mt-1">₹{totalGrossRevenue.toLocaleString('en-IN')}</p>
+              </div>
+            </div>
+
+            {/* Mode Switcher Tabs */}
+            <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+              <button
+                onClick={() => setLedgerViewMode('ORDERS')}
+                className={`px-4 py-2 text-xs font-extrabold rounded-xl transition-colors cursor-pointer flex items-center gap-2 ${
+                  ledgerViewMode === 'ORDERS'
+                    ? 'bg-slate-900 text-amber-400 shadow-xs'
+                    : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                }`}
               >
-                <option value="ALL">All Merchants & Master Store</option>
-                {shopkeepers.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} ({s.store_name || s.shopkeeper_id})
-                  </option>
-                ))}
-              </select>
+                <Package className="w-4 h-4" />
+                <span>Confirmed & Delivered Orders Movement ({orderMovements.length})</span>
+              </button>
+
+              <button
+                onClick={() => setLedgerViewMode('INVENTORY')}
+                className={`px-4 py-2 text-xs font-extrabold rounded-xl transition-colors cursor-pointer flex items-center gap-2 ${
+                  ledgerViewMode === 'INVENTORY'
+                    ? 'bg-slate-900 text-amber-400 shadow-xs'
+                    : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                }`}
+              >
+                <History className="w-4 h-4" />
+                <span>Manual Inventory Log ({filteredTransactions.length})</span>
+              </button>
             </div>
 
-            <div className="text-xs text-slate-500">
-              Total Transactions: <strong className="text-slate-900">{filteredTransactions.length}</strong>
-            </div>
-          </div>
+            {/* MODE A: CONFIRMED & DELIVERED ORDERS MOVEMENT TABLE */}
+            {ledgerViewMode === 'ORDERS' && (
+              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
+                <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                  <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                    <Truck className="w-4 h-4 text-indigo-600" />
+                    Order-wise Stock Movement Ledger
+                  </h4>
+                  <span className="text-xs text-slate-500 font-bold">
+                    Showing {orderMovements.length} order items
+                  </span>
+                </div>
 
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs text-slate-700">
-                <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase font-bold tracking-wider border-b border-slate-200">
-                  <tr>
-                    <th className="px-4 py-3">Tx ID / Date</th>
-                    <th className="px-4 py-3">Product / SKU</th>
-                    <th className="px-4 py-3">Merchant Store</th>
-                    <th className="px-4 py-3">Type</th>
-                    <th className="px-4 py-3 text-right">Quantity</th>
-                    <th className="px-4 py-3 text-center">Prev → New</th>
-                    <th className="px-4 py-3">Performed By</th>
-                    <th className="px-4 py-3">Notes</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredTransactions.map((tx) => {
-                    const isIncrease = tx.transaction_type === 'IN' || tx.transaction_type === 'RETURN_STOCK_IN';
-                    return (
-                      <tr key={tx.id} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="px-4 py-3 font-mono">
-                          <div className="font-bold text-slate-900">{tx.transaction_id}</div>
-                          <div className="text-[10px] text-slate-400">
-                            {new Date(tx.timestamp).toLocaleString('en-IN', {
-                              dateStyle: 'short',
-                              timeStyle: 'short',
-                            })}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="font-bold text-slate-800 line-clamp-1">{tx.product_name}</div>
-                          <div className="text-[10px] font-mono text-slate-400">{tx.sku}</div>
-                        </td>
-                        <td className="px-4 py-3 font-semibold text-slate-800">
-                          {tx.shopkeeper_name}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span
-                            className={`inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full ${
-                              isIncrease
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : 'bg-rose-100 text-rose-800'
-                            }`}
-                          >
-                            {isIncrease ? (
-                              <ArrowUpRight className="w-3 h-3 text-emerald-600" />
-                            ) : (
-                              <ArrowDownRight className="w-3 h-3 text-rose-600" />
-                            )}
-                            {tx.transaction_type}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right font-black font-mono text-sm">
-                          <span className={isIncrease ? 'text-emerald-700' : 'text-rose-700'}>
-                            {isIncrease ? `+${tx.quantity}` : `-${tx.quantity}`}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-center font-mono text-slate-500">
-                          {tx.previous_stock} → <strong className="text-slate-900">{tx.new_stock}</strong>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="font-semibold text-slate-800">{tx.performed_by_name}</div>
-                          <div className="text-[10px] text-slate-400 uppercase font-mono">{tx.performed_by}</div>
-                        </td>
-                        <td className="px-4 py-3 text-slate-500 italic max-w-xs truncate">
-                          {tx.reference_note || tx.reason || 'Standard update'}
-                        </td>
+                {orderMovements.length === 0 ? (
+                  <div className="p-12 text-center text-slate-400 space-y-2">
+                    <Boxes className="w-10 h-10 mx-auto opacity-30" />
+                    <p className="text-xs font-bold">No confirmed or delivered order stock movements found for this merchant.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs text-slate-700">
+                      <thead className="bg-slate-100 text-slate-600 text-[10px] uppercase font-bold tracking-wider border-b border-slate-200">
+                        <tr>
+                          <th className="px-4 py-3">Order ID & Date</th>
+                          <th className="px-4 py-3">Customer Details</th>
+                          <th className="px-4 py-3">Shopkeeper Product & SKU</th>
+                          <th className="px-4 py-3 text-center">Qty Moved</th>
+                          <th className="px-4 py-3 text-right">Unit Rate</th>
+                          <th className="px-4 py-3 text-right">Total Payable</th>
+                          <th className="px-4 py-3 text-center">Order Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {orderMovements.map(({ order: ord, item, product, shopkeeperName }, i) => {
+                          const isDelivered = ord.order_status === 'Delivered';
+                          const isCancelled = ord.order_status === 'Cancelled';
+                          const lineTotal = (item.price || 0) * (item.quantity || 1);
+
+                          return (
+                            <tr key={`${ord.id}-${item.id || i}`} className="hover:bg-slate-50/80 transition-colors">
+                              {/* Order ID & Date */}
+                              <td className="px-4 py-3 font-mono">
+                                <div className="font-extrabold text-indigo-900 text-xs">{ord.order_id}</div>
+                                <div className="text-[10px] text-slate-500">
+                                  {new Date(ord.created_at).toLocaleString('en-IN', {
+                                    dateStyle: 'short',
+                                    timeStyle: 'short',
+                                  })}
+                                </div>
+                              </td>
+
+                              {/* Customer Details */}
+                              <td className="px-4 py-3">
+                                <div className="font-bold text-slate-900">{ord.customer_name}</div>
+                                <div className="text-[10px] text-slate-500 font-mono">+91 {ord.mobile}</div>
+                              </td>
+
+                              {/* Product & SKU */}
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-2">
+                                  {(item.image_url || product?.images?.[0]?.image_url) && (
+                                    <img
+                                      src={item.image_url || product?.images?.[0]?.image_url}
+                                      alt={item.product_name}
+                                      className="w-8 h-8 rounded-lg object-cover border border-slate-200 shrink-0"
+                                    />
+                                  )}
+                                  <div>
+                                    <div className="font-bold text-slate-900 line-clamp-1">{item.product_name}</div>
+                                    <div className="text-[10px] text-slate-500 font-mono">
+                                      SKU: {item.sku || product?.sku || 'N/A'} {item.size ? `• Size: ${item.size}` : ''} {item.color ? `• Color: ${item.color}` : ''}
+                                    </div>
+                                    <div className="text-[9px] text-amber-800 font-bold">Partner: {shopkeeperName}</div>
+                                  </div>
+                                </div>
+                              </td>
+
+                              {/* Qty */}
+                              <td className="px-4 py-3 text-center">
+                                <span className="px-2.5 py-1 bg-amber-100/80 text-amber-900 font-mono font-black text-xs rounded-lg border border-amber-300">
+                                  {item.quantity || 1} Pcs
+                                </span>
+                              </td>
+
+                              {/* Unit Rate */}
+                              <td className="px-4 py-3 text-right font-mono font-bold text-slate-700">
+                                ₹{(item.price || 0).toLocaleString('en-IN')}
+                              </td>
+
+                              {/* Total Amount */}
+                              <td className="px-4 py-3 text-right font-mono font-black text-slate-900 text-sm">
+                                ₹{lineTotal.toLocaleString('en-IN')}
+                              </td>
+
+                              {/* Order Status */}
+                              <td className="px-4 py-3 text-center">
+                                <span
+                                  className={`inline-flex items-center gap-1 text-[10px] font-black px-2.5 py-1 rounded-full uppercase ${
+                                    isDelivered
+                                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                      : isCancelled
+                                      ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                                      : 'bg-amber-100 text-amber-900 border border-amber-300'
+                                  }`}
+                                >
+                                  {isDelivered && <CheckCircle className="w-3 h-3 text-emerald-600" />}
+                                  {ord.order_status}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* MODE B: MANUAL INVENTORY TRANSACTION LOG */}
+            {ledgerViewMode === 'INVENTORY' && (
+              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs text-slate-700">
+                    <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase font-bold tracking-wider border-b border-slate-200">
+                      <tr>
+                        <th className="px-4 py-3">Tx ID / Date</th>
+                        <th className="px-4 py-3">Product / SKU</th>
+                        <th className="px-4 py-3">Merchant Store</th>
+                        <th className="px-4 py-3">Type</th>
+                        <th className="px-4 py-3 text-right">Quantity</th>
+                        <th className="px-4 py-3 text-center">Prev → New</th>
+                        <th className="px-4 py-3">Performed By</th>
+                        <th className="px-4 py-3">Notes</th>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredTransactions.map((tx) => {
+                        const isIncrease = tx.transaction_type === 'IN' || tx.transaction_type === 'RETURN_STOCK_IN';
+                        return (
+                          <tr key={tx.id} className="hover:bg-slate-50/80 transition-colors">
+                            <td className="px-4 py-3 font-mono">
+                              <div className="font-bold text-slate-900">{tx.transaction_id}</div>
+                              <div className="text-[10px] text-slate-400">
+                                {new Date(tx.timestamp).toLocaleString('en-IN', {
+                                  dateStyle: 'short',
+                                  timeStyle: 'short',
+                                })}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="font-bold text-slate-800 line-clamp-1">{tx.product_name}</div>
+                              <div className="text-[10px] font-mono text-slate-400">{tx.sku}</div>
+                            </td>
+                            <td className="px-4 py-3 font-semibold text-slate-800">
+                              {tx.shopkeeper_name}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span
+                                className={`inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full ${
+                                  isIncrease
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : 'bg-rose-100 text-rose-800'
+                                }`}
+                              >
+                                {isIncrease ? (
+                                  <ArrowUpRight className="w-3 h-3 text-emerald-600" />
+                                ) : (
+                                  <ArrowDownRight className="w-3 h-3 text-rose-600" />
+                                )}
+                                {tx.transaction_type}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-right font-black font-mono text-sm">
+                              <span className={isIncrease ? 'text-emerald-700' : 'text-rose-700'}>
+                                {isIncrease ? `+${tx.quantity}` : `-${tx.quantity}`}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-center font-mono text-slate-500">
+                              {tx.previous_stock} → <strong className="text-slate-900">{tx.new_stock}</strong>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="font-semibold text-slate-800">{tx.performed_by_name}</div>
+                              <div className="text-[10px] text-slate-400 uppercase font-mono">{tx.performed_by}</div>
+                            </td>
+                            <td className="px-4 py-3 text-slate-500 italic max-w-xs truncate">
+                              {tx.reference_note || tx.reason || 'Standard update'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* MODAL 1: ADD SHOPKEEPER */}
       {isAddModalOpen && (

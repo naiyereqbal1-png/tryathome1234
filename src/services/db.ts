@@ -1647,7 +1647,34 @@ class DatabaseService {
     try {
       const data = this.getStorageItem(STORAGE_KEYS.CUSTOMERS);
       const list: Customer[] = data ? JSON.parse(data) : [];
-      return list.sort((a, b) => {
+
+      // Dynamically calculate order count & total spent for each customer across all orders
+      const allOrders = this.getOrders();
+      const updatedList = list.map((c) => {
+        const cleanMobile = (c.mobile || '').replace(/\D/g, '').slice(-10);
+        const userOrders = allOrders.filter(
+          (o) =>
+            o.customer_id === c.customer_id ||
+            o.customer_id === c.id ||
+            o.address?.customer_id === c.customer_id ||
+            (cleanMobile && (o.mobile || '').replace(/\D/g, '').slice(-10) === cleanMobile)
+        );
+
+        const activeOrders = userOrders.filter((o) => o.order_status !== 'Cancelled');
+        const calcTotalOrders = userOrders.length;
+        const calcTotalSpent = activeOrders.reduce((sum, o) => {
+          const calc = this.getOrderBillCalculation(o);
+          return sum + (calc.final_payable || o.final_payable_amount || o.total || 0);
+        }, 0);
+
+        return {
+          ...c,
+          total_orders: Math.max(c.total_orders || 0, calcTotalOrders),
+          total_spent: Math.max(c.total_spent || 0, calcTotalSpent),
+        };
+      });
+
+      return updatedList.sort((a, b) => {
         const timeA = new Date(a.created_at || a.last_order_at || 0).getTime();
         const timeB = new Date(b.created_at || b.last_order_at || 0).getTime();
         return timeB - timeA;
@@ -6370,10 +6397,22 @@ class DatabaseService {
     return this.getAllReviews().filter((r) => r.product_id === productId);
   }
 
-  getCustomerReviews(customerId: string): ProductReview[] {
-    return this.getAllReviews().filter(
-      (r) => r.customer_id === customerId
+  getCustomerReviews(customerIdOrMobile: string): ProductReview[] {
+    const cust = this.getCustomers().find(
+      (c) => c.customer_id === customerIdOrMobile || c.id === customerIdOrMobile || c.mobile === customerIdOrMobile
     );
+    const cleanMobile = cust ? (cust.mobile || '').replace(/\D/g, '').slice(-10) : customerIdOrMobile.replace(/\D/g, '').slice(-10);
+
+    return this.getAllReviews().filter((r) => {
+      if (r.customer_id === customerIdOrMobile) return true;
+      if (cust && (r.customer_id === cust.customer_id || r.customer_id === cust.id)) return true;
+      if (cleanMobile && r.customer_mobile && r.customer_mobile.replace(/\D/g, '').slice(-10) === cleanMobile) return true;
+      return false;
+    });
+  }
+
+  getOrderReviews(orderId: string): ProductReview[] {
+    return this.getAllReviews().filter((r) => r.order_id === orderId);
   }
 
   getProductRatingStats(productId: string): ProductRatingStats {
