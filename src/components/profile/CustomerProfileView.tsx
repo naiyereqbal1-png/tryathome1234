@@ -219,9 +219,9 @@ export const CustomerProfileView: React.FC<CustomerProfileViewProps> = ({
     if (!confirm('Are you sure you want to delete this address?')) return;
     setIsAddressSaving(true);
     try {
-      await db.deleteCustomerAddressAsync(id);
-      const current = db.getCurrentCustomer();
-      if (current) setLocalCustomer(current);
+      await db.deleteCustomerAddressAsync(id, customer.id || customer.customer_id);
+      const updatedCust = db.getCustomers().find(c => c.id === customer.id || c.customer_id === customer.customer_id) || db.getCurrentCustomer();
+      if (updatedCust) setLocalCustomer(updatedCust);
     } catch (err: any) {
       console.error("[Customer Address] Delete error:", err);
       alert('Failed to delete address: ' + err.message);
@@ -243,9 +243,9 @@ export const CustomerProfileView: React.FC<CustomerProfileViewProps> = ({
         landmark: addr.landmark || '',
         address_type: addr.address_type,
         is_default: true,
-      }, addr.id);
-      const current = db.getCurrentCustomer();
-      if (current) setLocalCustomer(current);
+      }, addr.id, customer.id || customer.customer_id);
+      const updatedCust = db.getCustomers().find(c => c.id === customer.id || c.customer_id === customer.customer_id) || db.getCurrentCustomer();
+      if (updatedCust) setLocalCustomer(updatedCust);
     } catch (err: any) {
       console.error("[Customer Address] Set default error:", err);
       alert('Failed to update default address: ' + err.message);
@@ -297,15 +297,17 @@ export const CustomerProfileView: React.FC<CustomerProfileViewProps> = ({
         landmark: formLandmark.trim(),
         address_type: formType,
         is_default: formIsDefault,
-      }, editingAddressId || undefined);
+      }, editingAddressId || undefined, customer.id || customer.customer_id);
 
       if (saved) {
         setAddressSuccess(editingAddressId ? 'Address updated successfully in database!' : 'Address added successfully to database!');
         setAddressFormOpen(false);
         setEditingAddressId(null);
-        const current = db.getCurrentCustomer();
-        if (current) setLocalCustomer(current);
+        const updatedCust = db.getCustomers().find(c => c.id === customer.id || c.customer_id === customer.customer_id) || db.getCurrentCustomer();
+        if (updatedCust) setLocalCustomer(updatedCust);
         setTimeout(() => setAddressSuccess(''), 3500);
+      } else {
+        setAddressError('Failed to save address. Please try again.');
       }
     } catch (err: any) {
       console.error("[Customer Address] Save error:", err);
@@ -1001,26 +1003,10 @@ export const CustomerProfileView: React.FC<CustomerProfileViewProps> = ({
                                       );
                                       if (existingRev) {
                                         return (
-                                          <button
-                                            id={`edit-item-review-btn-${item.id}`}
-                                            type="button"
-                                            onClick={() => {
-                                              setReviewModalState({
-                                                isOpen: true,
-                                                productId: item.product_id,
-                                                productName: item.product_name,
-                                                productImage: item.image_url,
-                                                orderId: order.order_id,
-                                                orderItemId: item.id,
-                                                existingReview: existingRev,
-                                              });
-                                            }}
-                                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-[11px] font-bold shadow-2xs transition-colors cursor-pointer"
-                                            title="Edit your 5-star rating & review"
-                                          >
-                                            <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
+                                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-bold shadow-2xs">
+                                            <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
                                             <span>Reviewed ({existingRev.rating}★)</span>
-                                          </button>
+                                          </span>
                                         );
                                       }
                                       return (
@@ -1642,37 +1628,10 @@ export const CustomerProfileView: React.FC<CustomerProfileViewProps> = ({
                           </div>
 
                           <div className="flex items-center gap-2">
-                            <button
-                              id={`edit-review-tab-btn-${rev.id}`}
-                              onClick={() => {
-                                setReviewModalState({
-                                  isOpen: true,
-                                  productId: rev.product_id,
-                                  productName: rev.product_name,
-                                  productImage: prod?.images && prod.images[0]?.image_url,
-                                  orderId: rev.order_id,
-                                  orderItemId: rev.order_item_id,
-                                  existingReview: rev,
-                                });
-                              }}
-                              className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
-                              title="Edit Review"
-                            >
-                              <Edit3 className="w-4 h-4" />
-                            </button>
-                            <button
-                              id={`delete-review-tab-btn-${rev.id}`}
-                              onClick={async () => {
-                                if (window.confirm('Are you sure you want to delete your review?')) {
-                                  await db.deleteProductReviewAsync(rev.id);
-                                  setCustomerReviews(db.getCustomerReviews(customer.customer_id || customer.id));
-                                }
-                              }}
-                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                              title="Delete Review"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                            <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold inline-flex items-center gap-1 shadow-2xs">
+                              <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>Submitted & Verified</span>
+                            </span>
                           </div>
                         </div>
 

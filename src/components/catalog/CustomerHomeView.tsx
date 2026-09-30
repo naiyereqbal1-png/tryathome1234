@@ -325,7 +325,7 @@ export const CustomerHomeView: React.FC<CustomerHomeViewProps> = ({
                   <Check className="w-4 h-4 text-emerald-400" /> Cash on Delivery Available
                 </span>
                 <span className="flex items-center gap-1.5 font-semibold text-slate-300">
-                  <Check className="w-4 h-4 text-emerald-400" /> Free Returns in 7 Days
+                  <Check className="w-4 h-4 text-emerald-400" /> Same Day Replacement Only
                 </span>
                 <span className="flex items-center gap-1.5 font-semibold text-slate-300">
                   <Check className="w-4 h-4 text-emerald-400" /> 100% Genuine Certified

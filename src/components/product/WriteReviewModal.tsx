@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Star, X, CheckCircle2, ShieldCheck, Sparkles } from 'lucide-react';
+import { Star, X, CheckCircle2, ShieldCheck, Sparkles, Lock } from 'lucide-react';
 import { db } from '../../services/db';
 import { ProductReview } from '../../types';
 
@@ -161,7 +161,27 @@ export const WriteReviewModal: React.FC<WriteReviewModalProps> = ({
             </div>
           </div>
 
-          {successToast ? (
+          {existingReview ? (
+            <div className="py-6 text-center space-y-3 animate-in zoom-in-95">
+              <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center mx-auto">
+                <Lock className="w-6 h-6 text-slate-600" />
+              </div>
+              <h4 className="text-base font-black text-slate-900">Review Submitted & Locked</h4>
+              <p className="text-xs text-slate-600 max-w-xs mx-auto leading-relaxed">
+                You have already submitted a review ({existingReview.rating}★) for this garment. Reviews cannot be edited or deleted by customers after submission.
+              </p>
+              <div className="pt-2">
+                <button
+                  id="close-locked-review-btn"
+                  type="button"
+                  onClick={onClose}
+                  className="px-6 py-2.5 bg-slate-900 text-white text-xs font-bold rounded-xl hover:bg-slate-800 transition-all"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          ) : successToast ? (
             <div className="py-8 text-center space-y-2 animate-in zoom-in-95">
               <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto" />
               <h4 className="text-base font-bold text-slate-900">Thank you for your review!</h4>

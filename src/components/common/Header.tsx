@@ -157,7 +157,7 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="hidden md:inline text-slate-400">|</span>
             <span className="hidden md:flex items-center gap-1 text-slate-300">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-              100% Genuine Garments • 7-Day Easy Returns
+              100% Genuine Garments • Same Day Replacement Only
             </span>
           </div>
 

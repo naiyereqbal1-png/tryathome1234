@@ -62,10 +62,7 @@ export const ProductReviewsSection: React.FC<ProductReviewsSectionProps> = ({
     }
 
     if (eligibility.existingReview) {
-      setEditingReview(eligibility.existingReview);
-      setSelectedOrderForReview(eligibility.existingReview.order_id);
-      setSelectedOrderItemForReview(eligibility.existingReview.order_item_id);
-      setIsWriteModalOpen(true);
+      alert("You have already submitted a review for this product. Customer reviews cannot be modified or deleted once submitted.");
       return;
     }
 
@@ -121,23 +118,21 @@ export const ProductReviewsSection: React.FC<ProductReviewsSectionProps> = ({
         {/* Write / Edit Review Button */}
         <div>
           {currentCustomer ? (
-            eligibility.isEligible || eligibility.existingReview ? (
+            eligibility.existingReview ? (
+              <div className="text-right">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200/80 rounded-xl text-xs font-bold shadow-2xs">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>Review Submitted ({eligibility.existingReview.rating}★)</span>
+                </span>
+              </div>
+            ) : eligibility.isEligible ? (
               <button
                 id="write-product-review-btn"
                 onClick={handleOpenWriteReview}
                 className="w-full sm:w-auto px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-extrabold rounded-xl shadow-xs flex items-center justify-center gap-2 transition-all"
               >
-                {eligibility.existingReview ? (
-                  <>
-                    <Edit3 className="w-4 h-4 text-amber-400" />
-                    <span>Edit Your Review</span>
-                  </>
-                ) : (
-                  <>
-                    <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-                    <span>Write a Review</span>
-                  </>
-                )}
+                <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                <span>Write a Review</span>
               </button>
             ) : (
               <div className="text-right">
@@ -335,32 +330,7 @@ export const ProductReviewsSection: React.FC<ProductReviewsSectionProps> = ({
                     </div>
                   </div>
 
-                  {/* Edit / Delete (for review author) */}
-                  {isOwnReview && (
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        id={`edit-own-review-${rev.id}`}
-                        onClick={() => {
-                          setEditingReview(rev);
-                          setSelectedOrderForReview(rev.order_id);
-                          setSelectedOrderItemForReview(rev.order_item_id);
-                          setIsWriteModalOpen(true);
-                        }}
-                        title="Edit your review"
-                        className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        id={`delete-own-review-${rev.id}`}
-                        onClick={() => handleDeleteReview(rev.id)}
-                        title="Delete your review"
-                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  )}
+
                 </div>
 
                 {/* Star Rating & Review Title */}

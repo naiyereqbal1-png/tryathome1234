@@ -252,6 +252,9 @@ export async function fetchFullDataFromSupabase(): Promise<SupabaseFullData | nu
 
       return {
         ...o,
+        final_bill_generated: !!o.final_bill_generated,
+        final_bill_locked: !!o.final_bill_locked || !!o.final_bill_generated,
+        final_bill_generated_at: o.final_bill_generated_at || undefined,
         address: deliveryAddress,
         items: orderItems,
         status_history: orderHistory,
@@ -328,9 +331,31 @@ return activeFetchPromise;
 
 export async function supabaseSaveAddress(address: CustomerAddress): Promise<boolean> {
   try {
+    const custId = address.customer_id || address.id;
+    if (!address.id || !custId) return false;
+
+    // Ensure parent customer record exists in Supabase so foreign key constraint never fails
+    const { data: custExists } = await supabase
+      .from("customers")
+      .select("customer_id, id")
+      .or(`customer_id.eq.${custId},id.eq.${custId}`)
+      .maybeSingle();
+
+    if (!custExists) {
+      await supabase.from("customers").upsert({
+        id: custId,
+        customer_id: custId,
+        name: address.name || "Customer",
+        mobile: address.mobile || "9999999999",
+        status: "ACTIVE",
+        total_orders: 0,
+        total_spent: 0.0,
+      });
+    }
+
     const { error } = await supabase.from("customer_addresses").upsert({
       id: address.id,
-      customer_id: address.customer_id,
+      customer_id: custId,
       name: address.name,
       mobile: address.mobile,
       pincode: address.pincode,
@@ -339,7 +364,7 @@ export async function supabaseSaveAddress(address: CustomerAddress): Promise<boo
       city: address.city,
       state: address.state,
       landmark: address.landmark || null,
-      address_type: address.address_type,
+      address_type: address.address_type || "Home",
       is_default: !!address.is_default,
     });
     if (error) {
@@ -454,6 +479,9 @@ export async function supabaseSaveOrder(order: Order): Promise<boolean> {
       try_at_home_delivered_at: order.try_at_home_delivered_at || null,
       replacement_credit_applied: order.replacement_credit_applied || 0,
       replacement_credit_source_order_id: order.replacement_credit_source_id || null,
+      final_bill_generated: !!order.final_bill_generated,
+      final_bill_locked: !!order.final_bill_locked || !!order.final_bill_generated,
+      final_bill_generated_at: order.final_bill_generated_at || null,
       delivery_address: order.address ? JSON.parse(JSON.stringify(order.address)) : null,
       updated_at: new Date().toISOString(),
     };

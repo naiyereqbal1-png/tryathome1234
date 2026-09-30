@@ -480,7 +480,7 @@ export const OrderInvoiceModal: React.FC<OrderInvoiceModalProps> = ({
 
                 <div className="p-3 bg-slate-50/50 rounded-xl border border-slate-200 text-[10px] text-slate-500 space-y-1">
                   <p className="font-bold text-slate-700 uppercase">Terms & Conditions:</p>
-                  <p>1. Returns/replacements accepted within store policy duration.</p>
+                  <p>1. Same Day Replacement only. No cash returns accepted.</p>
                   <p>2. Garments must have original tags intact and remain unwashed.</p>
                   <p>3. This is a computer generated tax invoice. No signature required.</p>
                 </div>

@@ -383,7 +383,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                       <Check className="w-3 h-3 text-emerald-600" /> Cash on Delivery Available
                     </p>
                     <p className="flex items-center gap-1.5 text-slate-600 text-[11px]">
-                      <RotateCcw className="w-3 h-3 text-indigo-600" /> 7 Days Easy Return & Free Exchange
+                      <RotateCcw className="w-3 h-3 text-indigo-600" /> Same Day Replacement Only
                     </p>
                   </div>
                 )}
@@ -453,8 +453,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 </div>
                 <div className="p-2">
                   <RotateCcw className="w-5 h-5 text-indigo-600 mx-auto mb-1" />
-                  <span className="text-[11px] font-bold text-slate-800 block">7 Days Return</span>
-                  <span className="text-[10px] text-slate-400">Hassle-free exchange</span>
+                  <span className="text-[11px] font-bold text-slate-800 block">Same Day Replacement</span>
+                  <span className="text-[10px] text-slate-400">Instant size exchange</span>
                 </div>
                 <div className="p-2">
                   <Truck className="w-5 h-5 text-indigo-600 mx-auto mb-1" />

@@ -239,7 +239,47 @@ class DatabaseService {
       }
     }
     if (cloud.orders) {
-      this.setStorageItem(STORAGE_KEYS.ORDERS, JSON.stringify(cloud.orders));
+      const localOrders = this.getOrders();
+      const mergedOrdersMap = new Map<string, Order>();
+
+      for (const lo of localOrders) {
+        const key = lo.order_id || lo.id;
+        if (key) mergedOrdersMap.set(key, lo);
+      }
+
+      for (const co of cloud.orders) {
+        const key = co.order_id || co.id;
+        if (!key) continue;
+        const existingLocal = mergedOrdersMap.get(key);
+
+        if (existingLocal) {
+          const isLockedLocally = existingLocal.final_bill_generated === true || existingLocal.final_bill_locked === true;
+          const isLockedCloud = co.final_bill_generated === true || co.final_bill_locked === true;
+          const finalLocked = isLockedLocally || isLockedCloud;
+
+          const mergedOrder: Order = {
+            ...co,
+            ...existingLocal,
+            order_status: co.order_status || existingLocal.order_status,
+            final_bill_generated: finalLocked,
+            final_bill_locked: finalLocked,
+            final_bill_generated_at: existingLocal.final_bill_generated_at || co.final_bill_generated_at,
+            try_at_home_status: finalLocked ? 'CLOSED' : (co.try_at_home_status || existingLocal.try_at_home_status),
+          };
+          mergedOrdersMap.set(key, mergedOrder);
+        } else {
+          mergedOrdersMap.set(key, co);
+        }
+      }
+
+      const finalMergedOrders = Array.from(mergedOrdersMap.values());
+      this.setStorageItem(STORAGE_KEYS.ORDERS, JSON.stringify(finalMergedOrders));
+
+      finalMergedOrders.forEach((o) => {
+        if (o.final_bill_locked || o.final_bill_generated) {
+          supabaseSaveOrder(o).catch(() => {});
+        }
+      });
     }
     if (cloud.deliveryBoys) {
       this.setStorageItem(STORAGE_KEYS.DELIVERY_BOYS, JSON.stringify(cloud.deliveryBoys));
@@ -269,7 +309,28 @@ class DatabaseService {
       this.setStorageItem(STORAGE_KEYS.STOCK_TRANSACTIONS, JSON.stringify(cloud.stockTransactions));
     }
     if (cloud.reviews) {
-      this.setStorageItem(STORAGE_KEYS.REVIEWS, JSON.stringify(cloud.reviews));
+      const localReviews = this.getAllReviews();
+      const mergedReviewsMap = new Map<string, ProductReview>();
+
+      for (const lr of localReviews) {
+        const key = lr.id || `${lr.product_id}_${lr.customer_id}`;
+        if (key) mergedReviewsMap.set(key, lr);
+      }
+
+      for (const cr of cloud.reviews) {
+        const key = cr.id || `${cr.product_id}_${cr.customer_id}`;
+        if (!key) continue;
+        if (!mergedReviewsMap.has(key)) {
+          mergedReviewsMap.set(key, cr);
+        }
+      }
+
+      const finalMergedReviews = Array.from(mergedReviewsMap.values());
+      this.setStorageItem(STORAGE_KEYS.REVIEWS, JSON.stringify(finalMergedReviews));
+
+      localReviews.forEach((rev) => {
+        supabaseSaveReview(rev).catch(() => {});
+      });
     }
     if (cloud.cartItems && cloud.cartItems.length > 0) {
       const currentCust = this.getCurrentCustomer();
@@ -1585,7 +1646,12 @@ class DatabaseService {
   getCustomers(): Customer[] {
     try {
       const data = this.getStorageItem(STORAGE_KEYS.CUSTOMERS);
-      return data ? JSON.parse(data) : [];
+      const list: Customer[] = data ? JSON.parse(data) : [];
+      return list.sort((a, b) => {
+        const timeA = new Date(a.created_at || a.last_order_at || 0).getTime();
+        const timeB = new Date(b.created_at || b.last_order_at || 0).getTime();
+        return timeB - timeA;
+      });
     } catch {
       return [];
     }
@@ -2980,11 +3046,14 @@ class DatabaseService {
         total_spent: 0,
         addresses: [],
       };
-      customers.push(customer);
+      customers.unshift(customer);
       this.setStorageItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(customers));
     }
 
     this.setStorageItem(STORAGE_KEYS.CURRENT_CUSTOMER, JSON.stringify(customer));
+    supabaseSaveCustomer(customer).catch((err) => {
+      console.warn("[db] Background supabaseSaveCustomer warning:", err);
+    });
     notifyDataChanged();
     return { success: true, customer };
   }
@@ -3129,19 +3198,56 @@ class DatabaseService {
     return updated;
   }
 
-  async saveCustomerAddressAsync(addressData: Omit<CustomerAddress, 'id' | 'customer_id'>, addressId?: string): Promise<CustomerAddress | null> {
-    const current = this.getCurrentCustomer();
-    if (!current) return null;
-
+  async saveCustomerAddressAsync(
+    addressData: Omit<CustomerAddress, 'id' | 'customer_id'>,
+    addressId?: string,
+    targetCustomerId?: string
+  ): Promise<CustomerAddress | null> {
     const customers = this.getCustomers();
-    const cIdx = customers.findIndex((c) => c.id === current.id);
-    if (cIdx === -1) return null;
+    let current = this.getCurrentCustomer();
 
-    let addresses = customers[cIdx].addresses || [];
+    // 1. Locate customer in database
+    let cIdx = -1;
+    if (targetCustomerId) {
+      cIdx = customers.findIndex(
+        (c) => c.id === targetCustomerId || c.customer_id === targetCustomerId
+      );
+    }
+
+    if (cIdx === -1 && current) {
+      cIdx = customers.findIndex(
+        (c) => c.id === current.id || c.customer_id === current.customer_id
+      );
+    }
+
+    // 2. If customer is still not found in customers array, create or push record
+    if (cIdx === -1) {
+      const custToUse: Customer = current || {
+        id: targetCustomerId || `cust-${Date.now()}`,
+        customer_id: targetCustomerId || `CUST-${addressData.mobile}`,
+        name: addressData.name,
+        mobile: addressData.mobile,
+        addresses: [],
+        status: 'ACTIVE',
+        created_at: new Date().toISOString(),
+        total_orders: 0,
+        total_spent: 0,
+      };
+
+      cIdx = customers.length;
+      customers.push(custToUse);
+      current = custToUse;
+    } else {
+      current = customers[cIdx];
+    }
+
+    let addresses = [...(customers[cIdx].addresses || [])];
 
     if (addressData.is_default) {
       addresses = addresses.map((a) => ({ ...a, is_default: false }));
     }
+
+    const effectiveCustomerId = current.customer_id || current.id || `CUST-${current.mobile}`;
 
     let savedAddr: CustomerAddress;
 
@@ -3151,45 +3257,60 @@ class DatabaseService {
         savedAddr = {
           ...addresses[aIdx],
           ...addressData,
+          customer_id: effectiveCustomerId,
         };
         addresses[aIdx] = savedAddr;
       } else {
-        return null;
+        savedAddr = {
+          ...addressData,
+          id: addressId,
+          customer_id: effectiveCustomerId,
+          is_default: addresses.length === 0 ? true : !!addressData.is_default,
+        };
+        addresses.push(savedAddr);
       }
     } else {
       savedAddr = {
         ...addressData,
         id: `addr-${Date.now()}`,
-        customer_id: current.customer_id,
+        customer_id: effectiveCustomerId,
         is_default: addresses.length === 0 ? true : !!addressData.is_default,
       };
       addresses.push(savedAddr);
     }
 
-    const success = await supabaseSaveAddress(savedAddr);
-    if (!success) {
-      throw new Error("Failed to save address to database.");
-    }
-
+    // Always update local customer state first so user experience is instant and resilient
+    customers[cIdx].customer_id = effectiveCustomerId;
     customers[cIdx].addresses = addresses;
     this.setStorageItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(customers));
     this.setStorageItem(STORAGE_KEYS.CURRENT_CUSTOMER, JSON.stringify(customers[cIdx]));
     notifyDataChanged();
+
+    // Sync to Supabase in background
+    supabaseSaveAddress(savedAddr).catch((err) => {
+      console.warn("[db] Background supabaseSaveAddress warning:", err);
+    });
+
     return savedAddr;
   }
 
-  async deleteCustomerAddressAsync(addressId: string): Promise<boolean> {
-    const current = this.getCurrentCustomer();
-    if (!current) return false;
-
+  async deleteCustomerAddressAsync(addressId: string, targetCustomerId?: string): Promise<boolean> {
     const customers = this.getCustomers();
-    const cIdx = customers.findIndex((c) => c.id === current.id);
-    if (cIdx === -1) return false;
+    let current = this.getCurrentCustomer();
 
-    const success = await supabaseDeleteAddress(addressId);
-    if (!success) {
-      throw new Error("Failed to delete address from database.");
+    let cIdx = -1;
+    if (targetCustomerId) {
+      cIdx = customers.findIndex(
+        (c) => c.id === targetCustomerId || c.customer_id === targetCustomerId
+      );
     }
+    if (cIdx === -1 && current) {
+      cIdx = customers.findIndex(
+        (c) => c.id === current.id || c.customer_id === current.customer_id
+      );
+    }
+
+    if (cIdx === -1) return false;
 
     customers[cIdx].addresses = (customers[cIdx].addresses || []).filter((a) => a.id !== addressId);
     if (customers[cIdx].addresses.length > 0 && !customers[cIdx].addresses.some((a) => a.is_default)) {
@@ -3199,6 +3320,11 @@ class DatabaseService {
     this.setStorageItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(customers));
     this.setStorageItem(STORAGE_KEYS.CURRENT_CUSTOMER, JSON.stringify(customers[cIdx]));
     notifyDataChanged();
+
+    supabaseDeleteAddress(addressId).catch((err) => {
+      console.warn("[db] Background supabaseDeleteAddress warning:", err);
+    });
+
     return true;
   }
 
@@ -4402,6 +4528,35 @@ class DatabaseService {
     });
 
     this.setStorageItem(STORAGE_KEYS.ORDERS, JSON.stringify(orders));
+    supabaseSaveOrder(order).catch((err) => console.error("Supabase save error on generateFinalBill:", err));
+    notifyDataChanged();
+    return order;
+  }
+
+  // Admin can unlock / reopen order if needed
+  reopenOrder(orderId: string, reopenedBy = 'Admin'): Order {
+    const orders = this.getOrders();
+    const idx = orders.findIndex((o) => o.order_id === orderId || o.id === orderId);
+    if (idx === -1) {
+      throw new Error(`Order #${orderId} not found.`);
+    }
+
+    const order = orders[idx];
+    order.final_bill_generated = false;
+    order.final_bill_locked = false;
+    order.updated_at = new Date().toISOString();
+
+    order.status_history.push({
+      id: `sh-${Date.now()}`,
+      order_id: order.order_id,
+      status: order.order_status,
+      changed_by: `${reopenedBy} (Order Reopened)`,
+      changed_at: new Date().toISOString(),
+      notes: `Order and Final Bill unlocked & reopened by ${reopenedBy}.`,
+    });
+
+    this.setStorageItem(STORAGE_KEYS.ORDERS, JSON.stringify(orders));
+    supabaseSaveOrder(order).catch((err) => console.error("Supabase save error on reopenOrder:", err));
     notifyDataChanged();
     return order;
   }
@@ -6280,6 +6435,15 @@ class DatabaseService {
       (r) => (r.customer_id === cust.customer_id || r.customer_id === cust.id) && r.product_id === productId
     );
 
+    if (existing) {
+      return {
+        isEligible: false,
+        reason: 'You have already submitted a review for this garment. Reviews are locked after submission.',
+        eligibleOrders: [],
+        existingReview: existing,
+      };
+    }
+
     const allOrders = this.getOrders();
     const eligibleOrders = allOrders.filter((ord) => {
       const isCust = ord.customer_id === cust.customer_id || ord.customer_id === cust.id || ord.mobile === cust.mobile;
@@ -6301,14 +6465,14 @@ class DatabaseService {
         isEligible: false,
         reason: 'Reviews are available exclusively to verified buyers with completed billing and delivery.',
         eligibleOrders: [],
-        existingReview: existing || null,
+        existingReview: null,
       };
     }
 
     return {
       isEligible: true,
       eligibleOrders,
-      existingReview: existing || null,
+      existingReview: null,
     };
   }
 

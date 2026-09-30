@@ -20,6 +20,7 @@ import {
   AlertTriangle,
   ChevronRight,
   ExternalLink,
+  RefreshCw,
 } from 'lucide-react';
 import { DeliveryBoy, Order, OrderStatus, ProductReturn } from '../../types';
 import { db } from '../../services/db';
@@ -1019,15 +1020,49 @@ export const AdminOrderFullDetailModal: React.FC<AdminOrderFullDetailModalProps>
                       </div>
                     </div>
 
-                    {order.payment_status !== 'PAID' && (
-                      <button
-                        onClick={handleMarkPaymentPaid}
-                        className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                      >
-                        <CheckCircle className="w-4 h-4" />
-                        <span>Mark COD Payment as Received (PAID)</span>
-                      </button>
-                    )}
+                    <div className="space-y-2 pt-2">
+                      {!isFinalBillLocked ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (confirm('Submit and lock final bill for this order? Customer will no longer be able to modify items or re-submit.')) {
+                              db.generateFinalBill(order.order_id, 'Admin');
+                              onOrderUpdated();
+                              showToast('Final bill submitted & order locked successfully!');
+                            }
+                          }}
+                          className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                        >
+                          <Lock className="w-4 h-4 text-amber-300" />
+                          <span>Confirm & Submit Final Bill (Lock Order)</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (confirm('Re-open this order and unlock final bill for editing? (Admin Only)')) {
+                              db.reopenOrder(order.order_id, 'Admin');
+                              onOrderUpdated();
+                              showToast('Order reopened and bill unlocked by Admin.');
+                            }
+                          }}
+                          className="w-full py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold text-xs rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                        >
+                          <RefreshCw className="w-4 h-4 text-amber-700" />
+                          <span>Re-open Order / Unlock Bill (Admin Only)</span>
+                        </button>
+                      )}
+
+                      {order.payment_status !== 'PAID' && (
+                        <button
+                          onClick={handleMarkPaymentPaid}
+                          className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                          <span>Mark COD Payment as Received (PAID)</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

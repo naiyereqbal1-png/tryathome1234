@@ -46,8 +46,8 @@ export const Footer: React.FC<FooterProps> = ({
               <RotateCcw className="w-5 h-5" />
             </div>
             <div>
-              <h4 className="font-bold text-slate-100 text-sm">7-Day Free Returns</h4>
-              <p className="text-slate-400 text-[11px]">Doorstep reverse pickup</p>
+              <h4 className="font-bold text-slate-100 text-sm">Same Day Replacement</h4>
+              <p className="text-slate-400 text-[11px]">Instant size or color exchange</p>
             </div>
           </div>
 
@@ -196,7 +196,7 @@ export const Footer: React.FC<FooterProps> = ({
               <span className="hover:text-white cursor-pointer">Track Your Order</span>
             </li>
             <li>
-              <span className="hover:text-white cursor-pointer">7-Day Returns & Exchange</span>
+              <span className="hover:text-white cursor-pointer">Same Day Replacement Policy</span>
             </li>
             <li>
               <span className="hover:text-white cursor-pointer">Garment Size Chart</span>
