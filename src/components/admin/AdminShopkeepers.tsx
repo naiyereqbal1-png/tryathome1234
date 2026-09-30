@@ -89,15 +89,92 @@ export const AdminShopkeepers: React.FC = () => {
   const [newStoreName, setNewStoreName] = useState('');
   const [newMobile, setNewMobile] = useState('');
   const [newEmail, setNewEmail] = useState('');
-  const [newCity, setNewCity] = useState('New Delhi');
+  const [newCity, setNewCity] = useState('Garhwa');
+  const [newPincode, setNewPincode] = useState('822114');
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  // Rejection modal
+  // Edit Shopkeeper Modal State
+  const [isEditShopkeeperModalOpen, setIsEditShopkeeperModalOpen] = useState(false);
+  const [editShopkeeperData, setEditShopkeeperData] = useState({
+    id: '',
+    name: '',
+    store_name: '',
+    mobile: '',
+    email: '',
+    city: '',
+    pincode: '822114',
+    status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE',
+  });
+  const [editShopkeeperError, setEditShopkeeperError] = useState('');
+  const [editShopkeeperSuccess, setEditShopkeeperSuccess] = useState('');
+  const [isSavingShopkeeperEdit, setIsSavingShopkeeperEdit] = useState(false);
+
+  // Rejection modal & price overrides
   const [rejectModalProduct, setRejectModalProduct] = useState<Product | null>(null);
   const [rejectReason, setRejectReason] = useState('Image resolution too low. Please upload clear front and back angles.');
   const [adminPriceOverrides, setAdminPriceOverrides] = useState<Record<string, number>>({});
+
+  const handleOpenEditShopkeeper = (shop: Shopkeeper) => {
+    setEditShopkeeperData({
+      id: shop.id,
+      name: shop.name || '',
+      store_name: shop.store_name || '',
+      mobile: shop.mobile || '',
+      email: shop.email || '',
+      city: shop.city || 'Garhwa',
+      pincode: shop.pincode || (shop.pincodes && shop.pincodes[0]) || '822114',
+      status: shop.status || 'ACTIVE',
+    });
+    setEditShopkeeperError('');
+    setEditShopkeeperSuccess('');
+    setIsEditShopkeeperModalOpen(true);
+  };
+
+  const handleSaveShopkeeperEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEditShopkeeperError('');
+    setEditShopkeeperSuccess('');
+
+    if (!/^\d{6}$/.test(editShopkeeperData.pincode.trim())) {
+      setEditShopkeeperError('Please enter a valid 6-digit Pincode for store location.');
+      return;
+    }
+    if (!editShopkeeperData.name.trim()) {
+      setEditShopkeeperError('Shopkeeper name is required.');
+      return;
+    }
+
+    setIsSavingShopkeeperEdit(true);
+
+    try {
+      const res = await db.updateShopkeeperAsync(editShopkeeperData.id, {
+        name: editShopkeeperData.name.trim(),
+        store_name: editShopkeeperData.store_name.trim(),
+        mobile: editShopkeeperData.mobile.trim(),
+        email: editShopkeeperData.email.trim(),
+        city: editShopkeeperData.city.trim(),
+        pincode: editShopkeeperData.pincode.trim(),
+        pincodes: [editShopkeeperData.pincode.trim()],
+        status: editShopkeeperData.status,
+      });
+
+      if (res) {
+        const mappedAdmin = db.findAdminForPincode(editShopkeeperData.pincode.trim());
+        setEditShopkeeperSuccess(`Shopkeeper details updated successfully! Auto-mapped to Admin: ${mappedAdmin?.store_name || 'Master HQ'}`);
+        refreshData();
+        setTimeout(() => {
+          setIsEditShopkeeperModalOpen(false);
+          setEditShopkeeperSuccess('');
+        }, 1200);
+      }
+    } catch (err: any) {
+      setEditShopkeeperError(err.message || 'Failed to update shopkeeper.');
+    } finally {
+      setIsSavingShopkeeperEdit(false);
+    }
+  };
 
   const refreshData = () => {
     setShopkeepers(db.getShopkeepers());
@@ -209,6 +286,12 @@ export const AdminShopkeepers: React.FC = () => {
     e.preventDefault();
     setFormError('');
     setFormSuccess('');
+
+    if (!/^\d{6}$/.test(newPincode.trim())) {
+      setFormError('Please enter a valid 6-digit Pincode for shop location.');
+      return;
+    }
+
     setIsSaving(true);
 
     try {
@@ -218,13 +301,16 @@ export const AdminShopkeepers: React.FC = () => {
         mobile: newMobile,
         email: newEmail,
         city: newCity,
+        pincode: newPincode.trim(),
       });
 
-      setFormSuccess(`Shopkeeper partner "${created.name}" created successfully with ID: ${created.shopkeeper_id}`);
+      const mappedAdmin = db.findAdminForPincode(newPincode.trim());
+      setFormSuccess(`Shopkeeper partner "${created.name}" created! Auto-mapped to Admin: ${mappedAdmin?.store_name || 'Master HQ'}`);
       setNewName('');
       setNewStoreName('');
       setNewMobile('');
       setNewEmail('');
+      setNewPincode('822114');
       setTimeout(() => {
         setIsAddModalOpen(false);
         setFormSuccess('');
@@ -844,7 +930,16 @@ export const AdminShopkeepers: React.FC = () => {
                         <span>Products ({shopProds.length})</span>
                       </button>
 
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                        <button
+                          onClick={() => handleOpenEditShopkeeper(shop)}
+                          className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
+                          title="Edit Shopkeeper Details (Name, Pincode, Address, Mobile, Status)"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                          <span>Edit</span>
+                        </button>
+
                         <button
                           onClick={() => {
                             setEditingShopkeeper(shop);
@@ -1479,25 +1574,45 @@ export const AdminShopkeepers: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Store Pincode <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    maxLength={6}
+                    value={newPincode}
+                    onChange={(e) => setNewPincode(e.target.value.replace(/\D/g, ''))}
+                    placeholder="e.g. 822114"
+                    className="w-full px-3 py-2 bg-amber-50/50 border border-amber-300 rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                  {newPincode.length === 6 && (
+                    <span className="text-[10px] text-indigo-700 font-extrabold mt-1 block">
+                      📍 Admin: {db.findAdminForPincode(newPincode)?.store_name || 'Master HQ'}
+                    </span>
+                  )}
+                </div>
+                <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">City / Region</label>
                   <input
                     type="text"
                     value={newCity}
                     onChange={(e) => setNewCity(e.target.value)}
-                    placeholder="e.g. New Delhi"
+                    placeholder="e.g. Garhwa"
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Email (Optional)</label>
-                  <input
-                    type="email"
-                    value={newEmail}
-                    onChange={(e) => setNewEmail(e.target.value)}
-                    placeholder="rajesh@studio.in"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  />
-                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Email (Optional)</label>
+                <input
+                  type="email"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  placeholder="rajesh@studio.in"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
               </div>
 
               <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-600">
@@ -1603,6 +1718,169 @@ export const AdminShopkeepers: React.FC = () => {
                 Done
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: EDIT SHOPKEEPER DETAILS */}
+      {isEditShopkeeperModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
+            <div className="p-4 bg-slate-900 text-white flex items-center justify-between">
+              <h3 className="text-sm font-black flex items-center gap-2">
+                <Edit2 className="w-4 h-4 text-amber-400" />
+                <span>Edit Shopkeeper Details</span>
+              </h3>
+              <button
+                onClick={() => setIsEditShopkeeperModalOpen(false)}
+                className="text-slate-400 hover:text-white cursor-pointer"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveShopkeeperEdit} className="p-5 space-y-3.5">
+              {editShopkeeperError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl font-medium">
+                  {editShopkeeperError}
+                </div>
+              )}
+              {editShopkeeperSuccess && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl font-medium">
+                  {editShopkeeperSuccess}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Shopkeeper / Proprietor Name <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editShopkeeperData.name}
+                  onChange={(e) => setEditShopkeeperData({ ...editShopkeeperData, name: e.target.value })}
+                  placeholder="e.g. Ramesh Singh"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Store / Brand Name
+                </label>
+                <input
+                  type="text"
+                  value={editShopkeeperData.store_name}
+                  onChange={(e) => setEditShopkeeperData({ ...editShopkeeperData, store_name: e.target.value })}
+                  placeholder="e.g. Garhwa Textile Store"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Mobile Number (10 Digits) <span className="text-rose-500">*</span>
+                </label>
+                <div className="flex items-center">
+                  <span className="px-3 py-2 bg-slate-100 border border-r-0 border-slate-200 rounded-l-xl text-xs font-bold text-slate-500">
+                    +91
+                  </span>
+                  <input
+                    type="tel"
+                    required
+                    maxLength={10}
+                    value={editShopkeeperData.mobile}
+                    onChange={(e) => setEditShopkeeperData({ ...editShopkeeperData, mobile: e.target.value.replace(/\D/g, '') })}
+                    placeholder="9934123456"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-r-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Store Pincode <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    maxLength={6}
+                    value={editShopkeeperData.pincode}
+                    onChange={(e) => setEditShopkeeperData({ ...editShopkeeperData, pincode: e.target.value.replace(/\D/g, '') })}
+                    placeholder="e.g. 822114"
+                    className="w-full px-3 py-2 bg-amber-50/50 border border-amber-300 rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                  {editShopkeeperData.pincode.length === 6 && (
+                    <span className="text-[10px] text-indigo-700 font-extrabold mt-1 block">
+                      📍 Admin: {db.findAdminForPincode(editShopkeeperData.pincode)?.store_name || 'Master HQ'}
+                    </span>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">City / Region</label>
+                  <input
+                    type="text"
+                    value={editShopkeeperData.city}
+                    onChange={(e) => setEditShopkeeperData({ ...editShopkeeperData, city: e.target.value })}
+                    placeholder="e.g. Garhwa"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Email Address</label>
+                <input
+                  type="email"
+                  value={editShopkeeperData.email}
+                  onChange={(e) => setEditShopkeeperData({ ...editShopkeeperData, email: e.target.value })}
+                  placeholder="partner@store.in"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Account Status</label>
+                <select
+                  value={editShopkeeperData.status}
+                  onChange={(e) => setEditShopkeeperData({ ...editShopkeeperData, status: e.target.value as any })}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                >
+                  <option value="ACTIVE">ACTIVE (Can Access & Stock In)</option>
+                  <option value="INACTIVE">INACTIVE (Account Disabled)</option>
+                </select>
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  disabled={isSavingShopkeeperEdit}
+                  onClick={() => setIsEditShopkeeperModalOpen(false)}
+                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold rounded-xl cursor-pointer disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingShopkeeperEdit}
+                  className={`px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl cursor-pointer shadow-sm flex items-center gap-1.5 ${
+                    isSavingShopkeeperEdit ? 'opacity-70 cursor-not-allowed bg-slate-400 hover:bg-slate-400' : ''
+                  }`}
+                >
+                  {isSavingShopkeeperEdit ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    'Save Changes'
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

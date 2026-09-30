@@ -37,7 +37,7 @@ export const AdminOrderManagement: React.FC = () => {
   const [search, setSearch] = useState('');
   
   // Daily workspace filter states
-  const [dateRangeFilter, setDateRangeFilter] = useState<'TODAY' | 'YESTERDAY' | 'LAST_7_DAYS' | 'THIS_MONTH' | 'ALL'>('TODAY');
+  const [dateRangeFilter, setDateRangeFilter] = useState<'TODAY' | 'YESTERDAY' | 'LAST_7_DAYS' | 'THIS_MONTH' | 'ALL'>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [paymentFilter, setPaymentFilter] = useState<string>('ALL');
   const [partnerFilter, setPartnerFilter] = useState<string>('ALL');

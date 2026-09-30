@@ -15,6 +15,7 @@ import {
   Ruler,
 } from 'lucide-react';
 import { Product } from '../../types';
+import { db } from '../../services/db';
 import { ProductReviewsSection } from './ProductReviewsSection';
 
 interface ProductDetailModalProps {
@@ -42,7 +43,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const [selectedSize, setSelectedSize] = useState('M');
   const [selectedColor, setSelectedColor] = useState('Default');
   const [quantity, setQuantity] = useState(1);
-  const [pincode, setPincode] = useState('560001');
+  const [pincode, setPincode] = useState(() => {
+    const cust = db.getCurrentCustomer();
+    const addr = cust?.addresses?.find((a) => a.is_default) || cust?.addresses?.[0];
+    return cust && addr?.pincode ? addr.pincode : '822114';
+  });
   const [pincodeChecked, setPincodeChecked] = useState(false);
   const [showSizeChart, setShowSizeChart] = useState(false);
   const [isZoomed, setIsZoomed] = useState(false);
@@ -56,8 +61,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       setSelectedSize(s[0] || 'M');
       setSelectedColor(c[0] || 'Default');
       setQuantity(1);
+
+      const cust = db.getCurrentCustomer();
+      const addr = cust?.addresses?.find((a) => a.is_default) || cust?.addresses?.[0];
+      setPincode(cust && addr?.pincode ? addr.pincode : '822114');
     }
-  }, [product?.id]);
+  }, [product?.id, isOpen]);
 
   if (!isOpen || !product) return null;
 
@@ -370,21 +379,34 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 </div>
 
                 {pincodeChecked && (
-                  <div className="mt-2 text-xs space-y-1 text-slate-700 animate-in fade-in">
-                    <p className="flex items-center gap-1.5 text-emerald-700 font-bold">
-                      <Truck className="w-3.5 h-3.5" /> Express Delivery by{' '}
-                      {new Date(Date.now() + 3 * 86400000).toLocaleDateString('en-IN', {
-                        weekday: 'short',
-                        month: 'short',
-                        day: 'numeric',
-                      })}
-                    </p>
-                    <p className="flex items-center gap-1.5 text-slate-600 text-[11px]">
-                      <Check className="w-3 h-3 text-emerald-600" /> Cash on Delivery Available
-                    </p>
-                    <p className="flex items-center gap-1.5 text-slate-600 text-[11px]">
-                      <RotateCcw className="w-3 h-3 text-indigo-600" /> Same Day Replacement Only
-                    </p>
+                  <div className="mt-2.5 pt-2 border-t border-slate-200 text-xs space-y-1 animate-in fade-in">
+                    {db.isPincodeServiceable(pincode) ? (
+                      <>
+                        <p className="flex items-center gap-1.5 text-emerald-700 font-bold">
+                          <Truck className="w-3.5 h-3.5 text-emerald-600" /> Delivery Available at {pincode} by{' '}
+                          {new Date(Date.now() + 2 * 86400000).toLocaleDateString('en-IN', {
+                            weekday: 'short',
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                        </p>
+                        <p className="flex items-center gap-1.5 text-slate-600 text-[11px]">
+                          <Check className="w-3 h-3 text-emerald-600" /> Cash on Delivery & Try at Home Available
+                        </p>
+                        <p className="flex items-center gap-1.5 text-slate-600 text-[11px]">
+                          <RotateCcw className="w-3 h-3 text-indigo-600" /> Same Day Replacement Only
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="flex items-center gap-1.5 text-rose-700 font-bold">
+                          ✕ Delivery Not Available for Pincode {pincode}
+                        </p>
+                        <p className="text-[11px] text-slate-500">
+                          Delivery is available only for allowed pincodes ({db.getServiceablePincodes().join(', ')}).
+                        </p>
+                      </>
+                    )}
                   </div>
                 )}
               </div>

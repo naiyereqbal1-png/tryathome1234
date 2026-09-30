@@ -16,6 +16,10 @@ import {
   Send,
   Eye,
   EyeOff,
+  MapPin,
+  Plus,
+  Trash2,
+  MapPinOff,
 } from 'lucide-react';
 import { db } from '../../services/db';
 import { OtpService } from '../../services/otpService';
@@ -34,7 +38,9 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ onCatalogReset }) 
   const [testMobile, setTestMobile] = useState('');
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [isSendingTest, setIsSendingTest] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<'CAROUSEL' | 'GENERAL'>('CAROUSEL');
+  const [settingsTab, setSettingsTab] = useState<'CAROUSEL' | 'GENERAL' | 'PINCODES'>('CAROUSEL');
+  const [pincodeInput, setPincodeInput] = useState('');
+  const [pincodeMessage, setPincodeMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     const handleSync = () => {
@@ -91,6 +97,44 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ onCatalogReset }) 
     }
   };
 
+  const currentAllowedPincodes = db.getServiceablePincodes();
+
+  const handleAddPincode = (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = pincodeInput.replace(/\D/g, '').trim();
+    if (clean.length !== 6) {
+      setPincodeMessage({ type: 'error', text: 'Please enter a valid 6-digit Indian Pincode.' });
+      return;
+    }
+    const added = db.addServiceablePincode(clean);
+    if (added) {
+      setPincodeMessage({ type: 'success', text: `✓ Pincode ${clean} added to allowed delivery list!` });
+      setPincodeInput('');
+      setSettings(db.getSettings());
+      setTimeout(() => setPincodeMessage(null), 3000);
+    } else {
+      setPincodeMessage({ type: 'error', text: 'Failed to add pincode.' });
+    }
+  };
+
+  const handleRemovePincode = (pin: string) => {
+    if (pin === '822114') {
+      setPincodeMessage({ type: 'error', text: 'Pincode 822114 (Garhwa) is the mandatory default store pincode and cannot be removed.' });
+      setTimeout(() => setPincodeMessage(null), 3500);
+      return;
+    }
+    if (confirm(`Remove pincode ${pin} from allowed delivery list? Customers with this pincode will no longer be able to place orders.`)) {
+      db.removeServiceablePincode(pin);
+      setPincodeMessage({ type: 'success', text: `Pincode ${pin} removed.` });
+      setSettings(db.getSettings());
+      setTimeout(() => setPincodeMessage(null), 3000);
+    }
+  };
+
+  const currentAdmin = db.getCurrentAdmin();
+  const activeFilter = db.getActiveStoreFilter();
+  const isSuperAdmin = currentAdmin?.role === 'super_admin' && (!activeFilter || activeFilter === 'ALL');
+
   return (
     <div id="admin-settings-view" className="space-y-6 max-w-4xl">
       {/* Header */}
@@ -101,8 +145,8 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ onCatalogReset }) 
         </p>
       </div>
 
-      {/* Sub-Tabs: Hero Carousel vs Store Rules */}
-      <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+      {/* Sub-Tabs: Hero Carousel vs Store Rules vs Pincodes (Super Admin Only) */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
         <button
           type="button"
           onClick={() => setSettingsTab('CAROUSEL')}
@@ -118,6 +162,24 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ onCatalogReset }) 
             Live
           </span>
         </button>
+
+        {isSuperAdmin && (
+          <button
+            type="button"
+            onClick={() => setSettingsTab('PINCODES')}
+            className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 transition-all ${
+              settingsTab === 'PINCODES'
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+            }`}
+          >
+            <MapPin className="w-4 h-4 text-emerald-400" />
+            <span>ALLOWED PINCODES</span>
+            <span className="text-[10px] bg-emerald-500 text-white font-bold px-1.5 py-0.2 rounded">
+              {currentAllowedPincodes.length} Active
+            </span>
+          </button>
+        )}
 
         <button
           type="button"
@@ -135,6 +197,111 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ onCatalogReset }) 
 
       {settingsTab === 'CAROUSEL' ? (
         <AdminHeroCarouselSettings />
+      ) : (settingsTab === 'PINCODES' && isSuperAdmin) ? (
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-2xs space-y-6">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div>
+              <h2 className="font-extrabold text-base text-slate-900 flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-emerald-600" />
+                Serviceable Delivery Pincodes Management
+              </h2>
+              <p className="text-xs text-slate-500 mt-1">
+                Only customers entering or selecting an allowed pincode from this list can place orders or add delivery addresses. Unserviceable pincodes are rejected automatically.
+              </p>
+            </div>
+            <span className="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-extrabold rounded-full shrink-0">
+              {currentAllowedPincodes.length} Allowed Locations
+            </span>
+          </div>
+
+          {pincodeMessage && (
+            <div className={`p-3.5 rounded-xl text-xs font-bold flex items-center gap-2 ${
+              pincodeMessage.type === 'success'
+                ? 'bg-emerald-50 border border-emerald-300 text-emerald-800'
+                : 'bg-rose-50 border border-rose-300 text-rose-800'
+            }`}>
+              {pincodeMessage.type === 'success' ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              ) : (
+                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+              )}
+              <span>{pincodeMessage.text}</span>
+            </div>
+          )}
+
+          {/* Add Pincode Form */}
+          <form onSubmit={handleAddPincode} className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col sm:flex-row gap-3 items-end">
+            <div className="flex-1 w-full">
+              <label className="block text-xs font-extrabold text-slate-800 mb-1">
+                Add New 6-Digit Delivery Pincode
+              </label>
+              <input
+                type="text"
+                maxLength={6}
+                value={pincodeInput}
+                onChange={(e) => setPincodeInput(e.target.value.replace(/\D/g, ''))}
+                placeholder="e.g. 822114, 834001, 800001"
+                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900 outline-hidden focus:border-emerald-600"
+              />
+            </div>
+            <button
+              type="submit"
+              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold rounded-lg transition-colors flex items-center gap-1.5 shadow-xs shrink-0 w-full sm:w-auto justify-center"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Serviceable Pincode</span>
+            </button>
+          </form>
+
+          {/* Allowed Pincodes List */}
+          <div>
+            <h3 className="text-xs font-extrabold text-slate-800 mb-3 flex items-center justify-between">
+              <span>Active Allowed Pincodes List</span>
+              <span className="text-slate-400 font-normal">Default Fallback: 822114 (Garhwa)</span>
+            </h3>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              {currentAllowedPincodes.map((pin) => {
+                const isDefaultGarhwa = pin === '822114';
+                return (
+                  <div
+                    key={pin}
+                    className={`p-3 rounded-xl border flex items-center justify-between transition-all ${
+                      isDefaultGarhwa
+                        ? 'bg-amber-50/80 border-amber-300 text-amber-950 font-black'
+                        : 'bg-white border-slate-200 text-slate-900 font-bold hover:border-emerald-300 shadow-2xs'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <MapPin className={`w-4 h-4 shrink-0 ${isDefaultGarhwa ? 'text-amber-600' : 'text-emerald-600'}`} />
+                      <div className="truncate">
+                        <span className="text-sm font-extrabold block">{pin}</span>
+                        {isDefaultGarhwa && (
+                          <span className="text-[10px] text-amber-700 font-bold block -mt-0.5">DEFAULT GARHWA</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {!isDefaultGarhwa ? (
+                      <button
+                        type="button"
+                        onClick={() => handleRemovePincode(pin)}
+                        className="p-1 text-slate-400 hover:text-rose-600 rounded-md hover:bg-rose-50 transition-colors"
+                        title="Remove Pincode"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    ) : (
+                      <span className="text-[10px] text-amber-600 font-black bg-amber-200/60 px-1.5 py-0.5 rounded">
+                        Mandatory
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       ) : (
         <>
           {saveSuccess && (

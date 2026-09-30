@@ -271,6 +271,12 @@ export const CustomerProfileView: React.FC<CustomerProfileViewProps> = ({
       setAddressError('Please enter a valid 6-digit Pincode.');
       return;
     }
+    const cleanPin = formPincode.trim();
+    if (!db.isPincodeServiceable(cleanPin)) {
+      const allowedPins = db.getServiceablePincodes().join(', ');
+      setAddressError(`❌ Delivery is NOT available for pincode ${cleanPin}. Please enter an allowed delivery pincode (Allowed: ${allowedPins}).`);
+      return;
+    }
     if (!formAddress.trim()) {
       setAddressError('Please enter the complete address.');
       return;

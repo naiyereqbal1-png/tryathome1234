@@ -208,15 +208,22 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       return;
     }
 
-    if (newPincode.replace(/\D/g, '').length !== 6) {
+    const cleanPin = newPincode.trim();
+    if (cleanPin.replace(/\D/g, '').length !== 6) {
       setAddressError('Please enter a valid 6-digit Indian Pincode.');
+      return;
+    }
+
+    if (!db.isPincodeServiceable(cleanPin)) {
+      const allowedPins = db.getServiceablePincodes().join(', ');
+      setAddressError(`❌ Delivery is NOT available for pincode ${cleanPin}. Please enter an allowed delivery pincode (Allowed: ${allowedPins}).`);
       return;
     }
 
     const saved = db.saveCustomerAddress({
       name: newName.trim(),
       mobile: newMobile.trim(),
-      pincode: newPincode.trim(),
+      pincode: cleanPin,
       address: newAddress.trim(),
       city: newCity.trim(),
       state: newState.trim(),
@@ -253,10 +260,16 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
     // If user was actively typing a new address in the form, auto-save it on order confirmation
     if (!activeAddress && isAddingNewAddress && newName.trim() && newMobile.trim() && newPincode.trim() && newAddress.trim()) {
+      const cleanNewPin = newPincode.trim();
+      if (!db.isPincodeServiceable(cleanNewPin)) {
+        const allowedPins = db.getServiceablePincodes().join(', ');
+        setCheckoutError(`❌ Delivery is NOT available for pincode ${cleanNewPin}. Allowed delivery pincodes: ${allowedPins}`);
+        return;
+      }
       const autoSaved = db.saveCustomerAddress({
         name: newName.trim(),
         mobile: newMobile.trim(),
-        pincode: newPincode.trim(),
+        pincode: cleanNewPin,
         address: newAddress.trim(),
         city: newCity.trim(),
         state: newState.trim(),
@@ -277,6 +290,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
     if (!activeAddress) {
       setCheckoutError('Please enter and save a delivery address to proceed.');
+      setIsAddingNewAddress(true);
+      return;
+    }
+
+    if (!db.isPincodeServiceable(activeAddress.pincode)) {
+      const allowedPins = db.getServiceablePincodes().join(', ');
+      setCheckoutError(`❌ Unserviceable Address Pincode (${activeAddress.pincode}). Delivery is currently available only for allowed pincodes (${allowedPins}). Please add an address with a valid pincode.`);
       setIsAddingNewAddress(true);
       return;
     }
@@ -414,7 +434,18 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 </div>
               </div>
 
-              <div className="mt-8 flex gap-3 justify-center">
+              <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
+                <button
+                  id="success-view-orders-btn"
+                  onClick={() => {
+                    onClose();
+                    onOrderPlaced(orderPlacedSuccess);
+                  }}
+                  className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl text-xs shadow-md flex items-center justify-center gap-2"
+                >
+                  <Package className="w-4 h-4" />
+                  <span>🚚 Track Order & View Details</span>
+                </button>
                 <button
                   id="success-continue-shopping-btn"
                   onClick={onClose}

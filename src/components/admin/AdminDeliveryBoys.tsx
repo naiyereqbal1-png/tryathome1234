@@ -63,7 +63,8 @@ export const AdminDeliveryBoys: React.FC = () => {
     password: '',
     vehicle_number: '',
     vehicle_type: 'Motorcycle' as DeliveryBoy['vehicle_type'],
-    city: 'Bengaluru',
+    city: 'Garhwa',
+    pincode: '822114',
     status: 'Active' as DeliveryBoy['status'],
   });
   const [formError, setFormError] = useState('');
@@ -112,7 +113,8 @@ export const AdminDeliveryBoys: React.FC = () => {
       password: 'delivery123',
       vehicle_number: '',
       vehicle_type: 'Motorcycle',
-      city: 'Bengaluru',
+      city: 'Garhwa',
+      pincode: '822114',
       status: 'Active',
     });
     setFormError('');
@@ -128,7 +130,8 @@ export const AdminDeliveryBoys: React.FC = () => {
       password: boy.password || 'delivery123',
       vehicle_number: boy.vehicle_number || '',
       vehicle_type: boy.vehicle_type || 'Motorcycle',
-      city: boy.city || boy.assigned_area || 'Bengaluru',
+      city: boy.city || boy.assigned_area || 'Garhwa',
+      pincode: boy.pincode || (boy.pincodes && boy.pincodes[0]) || '822114',
       status: boy.status === 'Active' || boy.status === 'ACTIVE' ? 'Active' : 'Inactive',
     });
     setFormError('');
@@ -145,6 +148,10 @@ export const AdminDeliveryBoys: React.FC = () => {
     }
     if (!/^\d{10}$/.test(formData.mobile.replace(/\D/g, ''))) {
       setFormError('Please enter a valid 10-digit Indian mobile number');
+      return;
+    }
+    if (!/^\d{6}$/.test(formData.pincode.trim())) {
+      setFormError('Please enter a valid 6-digit Pincode for service area');
       return;
     }
     if (!formData.vehicle_number.trim()) {
@@ -164,6 +171,8 @@ export const AdminDeliveryBoys: React.FC = () => {
           vehicle_number: formData.vehicle_number.trim(),
           vehicle_type: formData.vehicle_type,
           city: formData.city.trim(),
+          pincode: formData.pincode.trim(),
+          pincodes: [formData.pincode.trim()],
           status: formData.status,
         });
       } else {
@@ -184,6 +193,8 @@ export const AdminDeliveryBoys: React.FC = () => {
           vehicle_number: formData.vehicle_number.trim(),
           vehicle_type: formData.vehicle_type,
           city: formData.city.trim(),
+          pincode: formData.pincode.trim(),
+          pincodes: [formData.pincode.trim()],
           status: formData.status,
         });
       }
@@ -1329,6 +1340,28 @@ export const AdminDeliveryBoys: React.FC = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Service Area Pincode *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    maxLength={6}
+                    value={formData.pincode}
+                    onChange={(e) =>
+                      setFormData({ ...formData, pincode: e.target.value.replace(/\D/g, '') })
+                    }
+                    placeholder="e.g. 822114"
+                    className="w-full p-2.5 bg-indigo-50/50 border border-indigo-300 rounded-lg text-xs font-mono font-bold focus:border-indigo-600 focus:outline-hidden"
+                  />
+                  {formData.pincode.length === 6 && (
+                    <span className="text-[10px] text-indigo-700 font-extrabold mt-1 block">
+                      📍 Admin: {db.findAdminForPincode(formData.pincode)?.store_name || 'Master HQ'}
+                    </span>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
                     Operational Hub / City *
                   </label>
                   <input
@@ -1336,29 +1369,29 @@ export const AdminDeliveryBoys: React.FC = () => {
                     required
                     value={formData.city}
                     onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                    placeholder="Bengaluru"
+                    placeholder="Garhwa"
                     className="w-full p-2.5 border border-slate-300 rounded-lg text-xs font-semibold focus:border-indigo-600 focus:outline-hidden"
                   />
                 </div>
+              </div>
 
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                    Status *
-                  </label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        status: e.target.value as DeliveryBoy['status'],
-                      })
-                    }
-                    className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold focus:border-indigo-600 focus:outline-hidden"
-                  >
-                    <option value="Active">Active (On Duty)</option>
-                    <option value="Inactive">Inactive (Off Duty)</option>
-                  </select>
-                </div>
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  Status *
+                </label>
+                <select
+                  value={formData.status}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      status: e.target.value as DeliveryBoy['status'],
+                    })
+                  }
+                  className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold focus:border-indigo-600 focus:outline-hidden"
+                >
+                  <option value="Active">Active (On Duty)</option>
+                  <option value="Inactive">Inactive (Off Duty)</option>
+                </select>
               </div>
 
               <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100">

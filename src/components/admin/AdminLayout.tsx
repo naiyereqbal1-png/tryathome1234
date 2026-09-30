@@ -16,6 +16,8 @@ import {
   Store,
   Truck,
   Sparkles,
+  ShieldCheck,
+  Building,
 } from 'lucide-react';
 import { AdminUser, Category, Product } from '../../types';
 import { db } from '../../services/db';
@@ -33,6 +35,7 @@ import { AdminSettings } from './AdminSettings';
 import { AdminShopkeepers } from './AdminShopkeepers';
 import { AdminHeroCarouselSettings } from './AdminHeroCarouselSettings';
 import { AdminThemeSettings } from './AdminThemeSettings';
+import { AdminUsersManagement } from './AdminUsersManagement';
 import { Image as ImageIcon } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -84,6 +87,25 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
     showToast(message, 'success');
   };
 
+  const isSuperAdminUser = admin.role === 'super_admin';
+  const isSuperAdmin = isSuperAdminUser;
+  const allAdmins = isSuperAdminUser ? db.getAdmins() : [];
+  const [selectedStoreFilter, setSelectedStoreFilter] = useState<string>(() => db.getActiveStoreFilter() || 'ALL');
+
+  // Multi-Admin & Franchises option is ONLY visible when Super Admin is viewing Master Overview ('ALL')
+  const isViewingMasterAll = isSuperAdminUser && selectedStoreFilter === 'ALL';
+
+  const handleStoreFilterChange = (storeId: string) => {
+    setSelectedStoreFilter(storeId);
+    db.setActiveStoreFilter(storeId === 'ALL' ? null : storeId);
+    if (storeId !== 'ALL' && activeTab === 'ADMIN_MANAGEMENT') {
+      setActiveTab('DASHBOARD');
+    }
+    window.dispatchEvent(new Event('style1_data_changed'));
+  };
+
+  const selectedFranchiseAdmin = allAdmins.find((a) => a.id === selectedStoreFilter);
+
   const menuItems = [
     { id: 'DASHBOARD', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'PRODUCTS', label: 'Products Catalog', icon: Package },
@@ -93,6 +115,9 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
     { id: 'ORDERS', label: 'Order History & Orders', icon: ShoppingBag },
     { id: 'DELIVERY_BOYS', label: 'Delivery Partner Portal', icon: Truck },
     { id: 'CUSTOMERS', label: 'Customers', icon: Users },
+    ...(isViewingMasterAll
+      ? [{ id: 'ADMIN_MANAGEMENT', label: 'Multi-Admin & Franchises', icon: ShieldCheck, badge: 'Super' }]
+      : []),
     { id: 'THEME_DESIGN', label: 'Website Theme & Design', icon: Sparkles, badge: 'Theme' },
     { id: 'SETTINGS', label: 'Store Settings', icon: Settings },
   ];
@@ -100,7 +125,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   return (
     <div id="admin-portal-root" className="h-screen overflow-hidden bg-slate-100 flex flex-col">
       {/* Top Global Admin Bar */}
-      <header className="bg-slate-900 text-white px-4 py-3 sticky top-0 z-40 flex items-center justify-between border-b border-slate-800">
+      <header className="bg-slate-900 text-white px-4 py-2.5 sticky top-0 z-40 flex items-center justify-between border-b border-slate-800">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
@@ -111,13 +136,44 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
 
           <div className="flex items-center gap-2">
             <span className="text-lg font-black tracking-tight text-white">TRYatHOME</span>
-            <span className="bg-amber-500 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded tracking-wide">
-              ADMIN
-            </span>
+            {isViewingMasterAll ? (
+              <span className="bg-amber-400 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded tracking-wide uppercase flex items-center gap-1">
+                👑 Super Master Admin
+              </span>
+            ) : (
+              <span className="bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded tracking-wide uppercase flex items-center gap-1">
+                🏢 {selectedFranchiseAdmin?.store_name || admin.store_name || 'Franchise Store Admin'}
+              </span>
+            )}
           </div>
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Super Admin Store Selector Filter */}
+          {isSuperAdminUser && (
+            <div className="flex items-center gap-1.5 sm:gap-2 bg-slate-800 border border-slate-700 px-2 sm:px-3 py-1 rounded-xl">
+              <Building className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 shrink-0" />
+              <span className="text-[11px] sm:text-xs text-slate-400 font-bold shrink-0 hidden sm:inline">
+                Filter Store:
+              </span>
+              <select
+                id="super-admin-store-filter-select"
+                value={selectedStoreFilter}
+                onChange={(e) => handleStoreFilterChange(e.target.value)}
+                className="bg-transparent text-amber-300 font-extrabold text-xs outline-hidden cursor-pointer max-w-[140px] sm:max-w-none truncate"
+              >
+                <option value="ALL" className="bg-slate-900 text-white font-bold">
+                  🌐 All Admins & Franchises (Master Overview)
+                </option>
+                {allAdmins.map((a) => (
+                  <option key={a.id} value={a.id} className="bg-slate-900 text-white font-bold">
+                    🏢 {a.store_name || a.name} ({a.name})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* Switch to Customer Storefront Button */}
           <button
             id="switch-to-customer-storefront-btn"
@@ -136,8 +192,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
               <span className="text-xs font-bold text-slate-200 block leading-tight">
                 {admin.name}
               </span>
-              <span className="text-[10px] text-slate-400 font-mono">
-                {admin.role.toUpperCase()}
+              <span className="text-[10px] text-amber-400 font-extrabold uppercase">
+                {admin.store_name || admin.role}
               </span>
             </div>
 
@@ -294,6 +350,28 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
         {/* Main Content Area */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
           <div className={`${activeTab === 'ORDERS' || activeTab === 'ORDER_MANAGEMENT' || activeTab === 'ORDER_HISTORY' ? 'max-w-[100%] px-1' : 'max-w-7xl'} mx-auto`}>
+            {/* Active Store Filter Indicator Banner for Super Admin */}
+            {isSuperAdmin && selectedStoreFilter !== 'ALL' && (
+              <div id="active-store-filter-banner" className="mb-4 p-3 bg-amber-50 border border-amber-200/80 rounded-2xl flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-amber-900 shadow-2xs">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
+                  <span>
+                    Active Store Filter:{' '}
+                    <strong className="text-amber-950 font-black underline">
+                      {allAdmins.find((a) => a.id === selectedStoreFilter)?.store_name || selectedStoreFilter}
+                    </strong>{' '}
+                    ({allAdmins.find((a) => a.id === selectedStoreFilter)?.name})
+                  </span>
+                </div>
+                <button
+                  id="reset-store-filter-btn"
+                  onClick={() => handleStoreFilterChange('ALL')}
+                  className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[11px] font-black transition-colors shadow-2xs"
+                >
+                  ✕ Switch to Master (All Stores)
+                </button>
+              </div>
+            )}
             {activeTab === 'DASHBOARD' && (
               <AdminDashboard
                 onNavigateTab={(tab) => {
@@ -330,6 +408,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
             {activeTab === 'DELIVERY_BOYS' && <AdminDeliveryBoys />}
 
             {activeTab === 'CUSTOMERS' && <AdminCustomers />}
+
+            {activeTab === 'ADMIN_MANAGEMENT' && <AdminUsersManagement />}
 
             {activeTab === 'HERO_CAROUSEL' && <AdminHeroCarouselSettings />}
 

@@ -15,6 +15,7 @@ import {
   DeliveryBoy,
   Shopkeeper,
   ProductReview,
+  AdminAccount,
 } from "../types";
 
 export interface SupabaseFullData {
@@ -28,6 +29,7 @@ export interface SupabaseFullData {
   returns: ProductReturn[];
   stockTransactions: StockTransaction[];
   reviews: ProductReview[];
+  adminAccounts?: AdminAccount[];
   cartItems?: any[];
   wishlistItems?: any[];
   authSessions?: any[];
@@ -120,6 +122,7 @@ export async function fetchFullDataFromSupabase(): Promise<SupabaseFullData | nu
       cartRes,
       wishlistRes,
       sessionsRes,
+      adminAccountsRes,
     ] = await Promise.all([
       safeQuery(supabase.from("store_settings").select("*").maybeSingle()),
       safeQuery(supabase.from("categories").select("*").order("sort_order", { ascending: true })),
@@ -139,6 +142,7 @@ export async function fetchFullDataFromSupabase(): Promise<SupabaseFullData | nu
       safeQuery(supabase.from("cart_items").select("*")),
       safeQuery(supabase.from("wishlist_items").select("*")),
       safeQuery(supabase.from("auth_sessions").select("*")),
+      safeQuery(supabase.from("admin_accounts").select("*")),
     ]);
 
     // 1. Settings
@@ -288,8 +292,12 @@ export async function fetchFullDataFromSupabase(): Promise<SupabaseFullData | nu
     const cartItems = (cartRes?.data as any[]) || [];
     const wishlistItems = (wishlistRes?.data as any[]) || [];
     const authSessions = (sessionsRes?.data as any[]) || [];
+    const adminAccounts: AdminAccount[] = ((adminAccountsRes?.data as any[]) || []).map((a) => ({
+      ...a,
+      assigned_pincodes: typeof a.assigned_pincodes === 'string' ? JSON.parse(a.assigned_pincodes) : (a.assigned_pincodes || ['822114']),
+    }));
 
-    console.log(`[Supabase Live Sync] Parallel fetch loaded ${products.length} products, ${orders.length} orders, ${customers.length} customers, ${reviews.length} reviews, ${cartItems.length} cart items, ${wishlistItems.length} wishlist items.`);
+    console.log(`[Supabase Live Sync] Parallel fetch loaded ${products.length} products, ${orders.length} orders, ${customers.length} customers, ${reviews.length} reviews, ${adminAccounts.length} admins.`);
     return {
       settings,
       categories,
@@ -301,6 +309,7 @@ export async function fetchFullDataFromSupabase(): Promise<SupabaseFullData | nu
       returns,
       stockTransactions,
       reviews,
+      adminAccounts,
       cartItems,
       wishlistItems,
       authSessions,
@@ -1340,6 +1349,43 @@ export async function supabaseDeleteAuthSession(token: string): Promise<boolean>
     return true;
   } catch (err) {
     return handleSupabaseError("auth_sessions", "delete session", err);
+  }
+}
+
+export async function supabaseSaveAdminAccount(admin: AdminAccount): Promise<boolean> {
+  try {
+    const { error } = await supabase.from("admin_accounts").upsert({
+      id: admin.id,
+      admin_code: admin.admin_code || null,
+      name: admin.name,
+      mobile: admin.mobile,
+      email: admin.email,
+      email_or_mobile: admin.email_or_mobile || admin.email || admin.mobile,
+      password_pin: admin.password_pin || '123456',
+      role: admin.role,
+      store_name: admin.store_name || 'Franchise Store',
+      assigned_pincodes: JSON.stringify(admin.assigned_pincodes || ['822114']),
+      status: admin.status || 'ACTIVE',
+      created_at: admin.created_at || new Date().toISOString(),
+    });
+    if (error) {
+      return handleSupabaseError("admin_accounts", "save admin account", error);
+    }
+    return true;
+  } catch (err) {
+    return handleSupabaseError("admin_accounts", "save admin account", err);
+  }
+}
+
+export async function supabaseDeleteAdminAccount(id: string): Promise<boolean> {
+  try {
+    const { error } = await supabase.from("admin_accounts").delete().eq("id", id);
+    if (error) {
+      return handleSupabaseError("admin_accounts", "delete admin account", error);
+    }
+    return true;
+  } catch (err) {
+    return handleSupabaseError("admin_accounts", "delete admin account", err);
   }
 }
 

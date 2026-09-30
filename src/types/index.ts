@@ -38,6 +38,7 @@ export interface CustomerAddress {
 export interface Customer {
   id: string;
   customer_id: string; // e.g. STYLE1-CUST-000001
+  admin_id?: string; // Associated Franchise Admin Store ID
   name: string;
   mobile: string;
   email?: string;
@@ -86,6 +87,7 @@ export interface ProductVariant {
 
 export interface Product {
   id: string;
+  admin_id?: string;
   sku: string;
   name: string;
   slug: string;
@@ -348,6 +350,7 @@ export interface OrderStatusHistoryItem {
 export interface Order {
   id: string;
   order_id: string; // e.g. STYLE1-ORD-000001
+  admin_id?: string; // Associated Franchise Admin Store ID
   invoice_number?: string; // e.g. INV-10025
   customer_id: string; // e.g. STYLE1-CUST-000001
   customer_name: string;
@@ -406,8 +409,11 @@ export interface Order {
 export interface DeliveryBoy {
   id: string; // e.g. dboy-1
   delivery_boy_id: string; // e.g. STYLE1-DBOY-000001
+  admin_id?: string; // Associated Franchise Admin Store ID
   name: string;
   mobile: string;
+  pincode?: string; // Service area primary pincode (Mandatory)
+  pincodes?: string[]; // Service area pincodes list
   password?: string;
   email?: string;
   vehicle_type?: string;
@@ -489,11 +495,18 @@ export interface DeliveryBoyDetailedManagement {
 
 export interface AdminUser {
   id: string;
+  admin_code?: string;
   name: string;
   email_or_mobile: string;
+  mobile?: string;
+  email?: string;
+  password_pin?: string;
   role: 'super_admin' | 'admin' | 'inventory_manager';
+  store_name?: string;
+  assigned_pincodes?: string[];
   status: 'ACTIVE' | 'INACTIVE';
   avatar?: string;
+  created_at?: string;
 }
 
 export interface StoreSettings {
@@ -505,6 +518,7 @@ export interface StoreSettings {
   contact_phone: string;
   delivery_charge: number;
   free_delivery_threshold: number;
+  serviceable_pincodes?: string[]; // Allowed pincodes list configured by admin e.g. ['822114', '834001']
   cod_enabled: boolean;
   online_payment_enabled: boolean;
   min_order_value: number;
@@ -693,9 +707,12 @@ export interface ShopkeeperPermissions {
 export interface Shopkeeper {
   id: string; // e.g. shop-1
   shopkeeper_id: string; // e.g. STYLE1-SHOP-000001
+  admin_id?: string; // Associated Franchise Admin Store ID
   name: string;
   store_name?: string;
   mobile: string;
+  pincode?: string; // Shop location pincode (Mandatory)
+  pincodes?: string[]; // Serviceable pincodes
   email?: string;
   city?: string;
   status: 'ACTIVE' | 'INACTIVE';
@@ -743,10 +760,15 @@ export interface AuthSession {
 
 export interface AdminAccount {
   id: string;
+  admin_code?: string;
   name: string;
   mobile: string;
   email: string;
-  role: 'ADMIN' | 'super_admin';
+  email_or_mobile?: string;
+  password_pin?: string;
+  role: 'super_admin' | 'admin' | 'ADMIN';
+  store_name?: string;
+  assigned_pincodes?: string[];
   status: 'ACTIVE' | 'INACTIVE';
   created_at: string;
 }

@@ -61,17 +61,30 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenShopkeeper,
   isAdminView = false,
 }) => {
-  const activeCustomer = currentCustomer || customer || null;
+  const activeCustomer = currentCustomer || customer || db.getCurrentCustomer() || null;
+  const defaultAddress = activeCustomer?.addresses?.find((a) => a.is_default) || activeCustomer?.addresses?.[0];
+  const initialPin = activeCustomer && defaultAddress?.pincode ? defaultAddress.pincode : '822114';
+  const initialCity = activeCustomer && defaultAddress?.city ? defaultAddress.city.toUpperCase() : 'GARHWA';
+
   const [settings, setSettings] = useState(() => db.getSettings());
   const [categories, setCategories] = useState<Category[]>([]);
-  const [pincode, setPincode] = useState('560001');
+  const [pincode, setPincode] = useState(() => `${initialCity} ${initialPin}`);
   const [isEditingPincode, setIsEditingPincode] = useState(false);
-  const [tempPincode, setTempPincode] = useState('560001');
+  const [tempPincode, setTempPincode] = useState(() => initialPin);
   const [isAccountDropdownOpen, setIsAccountDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const updatedCustomer = currentCustomer || customer || db.getCurrentCustomer() || null;
+    const addr = updatedCustomer?.addresses?.find((a) => a.is_default) || updatedCustomer?.addresses?.[0];
+    const pin = updatedCustomer && addr?.pincode ? addr.pincode : '822114';
+    const city = updatedCustomer && addr?.city ? addr.city.toUpperCase() : 'GARHWA';
+    setPincode(`${city} ${pin}`);
+    setTempPincode(pin);
+  }, [currentCustomer?.id, customer?.id]);
 
   const handleQueryChange = (val: string) => {
     if (typeof onSearch === 'function') {
@@ -138,8 +151,14 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   const handlePincodeSave = () => {
-    if (tempPincode.length === 6) {
-      setPincode(tempPincode);
+    const clean = tempPincode.trim();
+    if (clean.length === 6) {
+      if (!db.isPincodeServiceable(clean)) {
+        alert(`❌ Unserviceable Pincode: Delivery is currently not available for pincode ${clean}.\nAllowed delivery pincodes: ${db.getServiceablePincodes().join(', ')}`);
+        setTempPincode(initialPin);
+        return;
+      }
+      setPincode(`${initialCity} ${clean}`);
       setIsEditingPincode(false);
     }
   };
@@ -439,6 +458,19 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
             )}
           </div>
+
+          {/* My Orders Direct Button */}
+          {activeCustomer && (
+            <button
+              id="header-orders-btn"
+              onClick={handleOrdersClick}
+              className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200/80 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 shadow-2xs"
+              title="Track My Orders"
+            >
+              <Package className="w-4 h-4 text-indigo-600 shrink-0" />
+              <span className="hidden sm:inline">My Orders</span>
+            </button>
+          )}
 
           {/* Wishlist Icon */}
           <button
