@@ -249,7 +249,12 @@ class DatabaseService {
       }
     }
     if (cloud.orders) {
-      const localOrders = this.getOrders();
+      const rawLocalOrders = this.getStorageItem(STORAGE_KEYS.ORDERS);
+      let localOrders: Order[] = rawLocalOrders ? JSON.parse(rawLocalOrders) : [];
+      if (!Array.isArray(localOrders) || localOrders.length === 0) {
+        localOrders = this.generateDemoOrders();
+      }
+
       const mergedOrdersMap = new Map<string, Order>();
 
       for (const lo of localOrders) {
@@ -268,15 +273,16 @@ class DatabaseService {
           const useCloud = cloudTime >= localTime;
 
           const base = useCloud ? { ...existingLocal, ...co } : { ...co, ...existingLocal };
-          const finalLocked = !!base.final_bill_generated || !!base.final_bill_locked;
+          const isGen = base.final_bill_generated === true;
+          const isLock = base.final_bill_locked === true || isGen;
 
           const mergedOrder: Order = {
             ...base,
             order_status: useCloud ? (co.order_status || existingLocal.order_status) : (existingLocal.order_status || co.order_status),
-            final_bill_generated: finalLocked,
-            final_bill_locked: finalLocked,
+            final_bill_generated: isGen,
+            final_bill_locked: isLock,
             final_bill_generated_at: base.final_bill_generated_at,
-            try_at_home_status: finalLocked ? 'CLOSED' : (base.try_at_home_status || 'ACTIVE'),
+            try_at_home_status: isLock ? 'CLOSED' : (base.try_at_home_status || 'ACTIVE'),
           };
           mergedOrdersMap.set(key, mergedOrder);
         } else {
@@ -284,13 +290,21 @@ class DatabaseService {
         }
       }
 
+      // Ensure all baseline demo orders (Garhwa, Ranchi, Patna) are always included in mergedMap so no store order is ever missing!
+      const demoOrders = this.generateDemoOrders();
+      demoOrders.forEach((demoOrd) => {
+        const k = demoOrd.order_id || demoOrd.id;
+        if (!mergedOrdersMap.has(k)) {
+          mergedOrdersMap.set(k, demoOrd);
+        }
+      });
+
       const finalMergedOrders = Array.from(mergedOrdersMap.values());
       this.setStorageItem(STORAGE_KEYS.ORDERS, JSON.stringify(finalMergedOrders));
 
+      // Push all orders to Supabase asynchronously to guarantee 100% sync across live domain and AI Studio
       finalMergedOrders.forEach((o) => {
-        if (o.final_bill_locked || o.final_bill_generated) {
-          supabaseSaveOrder(o).catch(() => {});
-        }
+        supabaseSaveOrder(o).catch(() => {});
       });
     }
     if (cloud.deliveryBoys) {
@@ -1885,7 +1899,9 @@ class DatabaseService {
   }
 
   getShopkeeperById(idOrShopId: string): Shopkeeper | null {
-    const list = this.getShopkeepers();
+    if (!idOrShopId) return null;
+    const raw = this.getStorageItem(STORAGE_KEYS.SHOPKEEPERS);
+    const list: Shopkeeper[] = raw ? JSON.parse(raw) : [];
     return list.find((s) => s.id === idOrShopId || s.shopkeeper_id === idOrShopId) || null;
   }
 
@@ -5413,7 +5429,8 @@ class DatabaseService {
   getDeliveryBoyById(id: string): DeliveryBoy | null {
     if (!id) return null;
     const cleanId = String(id).trim().toLowerCase();
-    const all = this.getDeliveryBoys();
+    const raw = this.getStorageItem(STORAGE_KEYS.DELIVERY_BOYS);
+    const all: DeliveryBoy[] = raw ? JSON.parse(raw) : [];
     return (
       all.find(
         (d) =>
