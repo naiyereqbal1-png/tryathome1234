@@ -463,30 +463,24 @@ export async function supabaseDeleteAddress(addressId: string): Promise<boolean>
   }
 }
 
-/**
- * Helper to resolve the delivery_boy_id needed for orders foreign key constraint (orders_assigned_delivery_boy_id_fkey)
- */
-export async function resolveCanonicalDeliveryBoyId(idOrBoyId?: string | null): Promise<string | null> {
+export async function resolveCanonicalDeliveryBoyId(idOrBoyId?: string | null, boyName?: string | null, boyMobile?: string | null): Promise<string | null> {
   if (!idOrBoyId) return null;
   const raw = idOrBoyId.trim();
-  if (raw.toUpperCase().startsWith("TEST-DELIVERY") || raw.toUpperCase().startsWith("STYLE1-DBOY")) {
+  if (!raw) return null;
+
+  try {
+    // Ensure delivery boy row exists in Supabase delivery_boys table to prevent foreign key violations
+    await supabase.from("delivery_boys").upsert({
+      id: raw,
+      delivery_boy_id: raw,
+      name: boyName || "Delivery Partner",
+      mobile: boyMobile || "9876543210",
+      status: "ACTIVE",
+    }, { onConflict: "id", ignoreDuplicates: true });
+    return raw;
+  } catch {
     return raw;
   }
-  try {
-    const { data } = await supabase
-      .from("delivery_boys")
-      .select("id, delivery_boy_id, mobile")
-      .or(`id.eq.${raw},delivery_boy_id.eq.${raw},mobile.eq.${raw}`)
-      .limit(1);
-    if (data && data.length > 0 && data[0].delivery_boy_id) {
-      return data[0].delivery_boy_id;
-    }
-  } catch {}
-  try {
-    const { data } = await supabase.from("delivery_boys").select("delivery_boy_id").limit(1);
-    if (data && data.length > 0) return data[0].delivery_boy_id;
-  } catch {}
-  return null;
 }
 
 export async function supabaseSaveOrder(order: Order): Promise<boolean> {
@@ -515,8 +509,16 @@ export async function supabaseSaveOrder(order: Order): Promise<boolean> {
     }
 
     // 3. Resolve canonical delivery boy IDs to prevent foreign key violations
-    const canonicalAssignedBoyId = await resolveCanonicalDeliveryBoyId(order.assigned_delivery_boy_id);
-    const canonicalOriginalBoyId = await resolveCanonicalDeliveryBoyId(order.original_delivery_boy_id || order.assigned_delivery_boy_id);
+    const canonicalAssignedBoyId = await resolveCanonicalDeliveryBoyId(
+      order.assigned_delivery_boy_id,
+      order.assigned_delivery_boy_name,
+      order.assigned_delivery_boy_mobile
+    );
+    const canonicalOriginalBoyId = await resolveCanonicalDeliveryBoyId(
+      order.original_delivery_boy_id || order.assigned_delivery_boy_id,
+      order.original_delivery_boy_name || order.assigned_delivery_boy_name,
+      order.original_delivery_boy_mobile || order.assigned_delivery_boy_mobile
+    );
 
     // 4. Insert order row
     const orderRow = {

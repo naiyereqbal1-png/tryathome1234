@@ -423,6 +423,11 @@ class DatabaseService {
 
     // Cross-tab and recovery sync listeners
     if (typeof window !== 'undefined') {
+      // Continuous 3-second live cloud polling for real-time responsiveness across devices
+      setInterval(() => {
+        this.syncFromSupabase();
+      }, 3000);
+
       window.addEventListener('style1_trigger_cloud_sync', () => {
         this.syncFromSupabase();
       });
