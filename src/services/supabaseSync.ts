@@ -292,10 +292,76 @@ export async function fetchFullDataFromSupabase(): Promise<SupabaseFullData | nu
     const cartItems = (cartRes?.data as any[]) || [];
     const wishlistItems = (wishlistRes?.data as any[]) || [];
     const authSessions = (sessionsRes?.data as any[]) || [];
+    const defaultCoreAdmins: AdminAccount[] = [
+      {
+        id: 'adm-1',
+        admin_code: 'SUPER-001',
+        name: 'TRYatHOME Super Admin',
+        email_or_mobile: 'admin@tryathome.in',
+        email: 'admin@tryathome.in',
+        mobile: '9876543210',
+        password_pin: 'tryathome',
+        role: 'super_admin',
+        store_name: 'Main HQ / Master Admin',
+        assigned_pincodes: ['822114', '834001', '800001', '834002', '822115'],
+        status: 'ACTIVE',
+        created_at: new Date().toISOString(),
+      },
+      {
+        id: 'adm-2',
+        admin_code: 'ADM-002',
+        name: 'Rajesh Kumar (Ranchi Admin)',
+        email_or_mobile: 'ranchi@tryathome.in',
+        email: 'ranchi@tryathome.in',
+        mobile: '9835123456',
+        password_pin: '123456',
+        role: 'admin',
+        store_name: 'Ranchi Franchise Store',
+        assigned_pincodes: ['834001', '834002'],
+        status: 'ACTIVE',
+        created_at: new Date().toISOString(),
+      },
+      {
+        id: 'adm-3',
+        admin_code: 'ADM-003',
+        name: 'Ramesh Singh (Garhwa Admin)',
+        email_or_mobile: 'garhwa@tryathome.in',
+        email: 'garhwa@tryathome.in',
+        mobile: '9934123456',
+        password_pin: '123456',
+        role: 'admin',
+        store_name: 'Garhwa Branch Store',
+        assigned_pincodes: ['822114', '822115'],
+        status: 'ACTIVE',
+        created_at: new Date().toISOString(),
+      },
+      {
+        id: 'adm-4',
+        admin_code: 'ADM-004',
+        name: 'Prakash Verma (Patna Admin)',
+        email_or_mobile: 'patna@tryathome.in',
+        email: 'patna@tryathome.in',
+        mobile: '9708123456',
+        password_pin: '123456',
+        role: 'admin',
+        store_name: 'Patna Central Store',
+        assigned_pincodes: ['800001'],
+        status: 'ACTIVE',
+        created_at: new Date().toISOString(),
+      },
+    ];
+
     const adminAccounts: AdminAccount[] = ((adminAccountsRes?.data as any[]) || []).map((a) => ({
       ...a,
       assigned_pincodes: typeof a.assigned_pincodes === 'string' ? JSON.parse(a.assigned_pincodes) : (a.assigned_pincodes || ['822114']),
     }));
+
+    defaultCoreAdmins.forEach((def) => {
+      if (!adminAccounts.some((a) => a.id === def.id)) {
+        adminAccounts.push(def);
+        supabaseSaveAdminAccount(def).catch(() => {});
+      }
+    });
 
     console.log(`[Supabase Live Sync] Parallel fetch loaded ${products.length} products, ${orders.length} orders, ${customers.length} customers, ${reviews.length} reviews, ${adminAccounts.length} admins.`);
     return {

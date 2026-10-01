@@ -1833,27 +1833,7 @@ class DatabaseService {
   }
 
   // ===================== ADMIN ACCOUNTS =====================
-  getAdmins(): AdminAccount[] {
-    try {
-      const data = this.getStorageItem(STORAGE_KEYS.ADMIN_ACCOUNTS);
-      if (data) return JSON.parse(data);
-      const defaultAdmins: AdminAccount[] = [
-        {
-          id: 'adm-1',
-          name: 'TRYatHOME Admin',
-          mobile: '9999999999',
-          email: 'admin@tryathome.in',
-          role: 'ADMIN',
-          status: 'ACTIVE',
-          created_at: new Date().toISOString(),
-        },
-      ];
-      this.setStorageItem(STORAGE_KEYS.ADMIN_ACCOUNTS, JSON.stringify(defaultAdmins));
-      return defaultAdmins;
-    } catch {
-      return [];
-    }
-  }
+
 
   getAdminByMobile(mobile: string): AdminAccount | null {
     const cleanMobile = mobile.replace(/\D/g, '').slice(-10);
@@ -3588,75 +3568,7 @@ class DatabaseService {
       const data = this.getStorageItem(STORAGE_KEYS.ADMIN_ACCOUNTS);
       let list: AdminAccount[] = data ? JSON.parse(data) : [];
 
-      if (!Array.isArray(list) || list.length === 0 || !list.some((a) => a.id === 'adm-1' || a.role === 'super_admin')) {
-        const defaultAdmins: AdminAccount[] = [
-          {
-            id: 'adm-1',
-            admin_code: 'SUPER-001',
-            name: 'TRYatHOME Super Admin',
-            email_or_mobile: 'admin@tryathome.in',
-            email: 'admin@tryathome.in',
-            mobile: '9876543210',
-            password_pin: 'tryathome',
-            role: 'super_admin',
-            store_name: 'Main HQ / Master Admin',
-            assigned_pincodes: ['822114', '834001', '800001', '834002', '822115'],
-            status: 'ACTIVE',
-            created_at: new Date().toISOString(),
-          },
-          {
-            id: 'adm-2',
-            admin_code: 'ADM-002',
-            name: 'Rajesh Kumar (Ranchi Admin)',
-            email_or_mobile: 'ranchi@tryathome.in',
-            email: 'ranchi@tryathome.in',
-            mobile: '9835123456',
-            password_pin: '123456',
-            role: 'admin',
-            store_name: 'Ranchi Franchise Store',
-            assigned_pincodes: ['834001', '834002'],
-            status: 'ACTIVE',
-            created_at: new Date().toISOString(),
-          },
-          {
-            id: 'adm-3',
-            admin_code: 'ADM-003',
-            name: 'Ramesh Singh (Garhwa Admin)',
-            email_or_mobile: 'garhwa@tryathome.in',
-            email: 'garhwa@tryathome.in',
-            mobile: '9934123456',
-            password_pin: '123456',
-            role: 'admin',
-            store_name: 'Garhwa Branch Store',
-            assigned_pincodes: ['822114', '822115'],
-            status: 'ACTIVE',
-            created_at: new Date().toISOString(),
-          },
-          {
-            id: 'adm-4',
-            admin_code: 'ADM-004',
-            name: 'Prakash Verma (Patna Admin)',
-            email_or_mobile: 'patna@tryathome.in',
-            email: 'patna@tryathome.in',
-            mobile: '9708123456',
-            password_pin: '123456',
-            role: 'admin',
-            store_name: 'Patna Central Store',
-            assigned_pincodes: ['800001'],
-            status: 'ACTIVE',
-            created_at: new Date().toISOString(),
-          },
-        ];
-
-        list = defaultAdmins;
-        this.setStorageItem(STORAGE_KEYS.ADMIN_ACCOUNTS, JSON.stringify(list));
-        defaultAdmins.forEach((a) => {
-          supabaseSaveAdminAccount(a).catch(() => {});
-        });
-      }
-      return list;
-    } catch {
-      return [
+      const defaultAdmins: AdminAccount[] = [
         {
           id: 'adm-1',
           admin_code: 'SUPER-001',
@@ -3667,11 +3579,70 @@ class DatabaseService {
           password_pin: 'tryathome',
           role: 'super_admin',
           store_name: 'Main HQ / Master Admin',
-          assigned_pincodes: ['822114', '834001', '800001'],
+          assigned_pincodes: ['822114', '834001', '800001', '834002', '822115'],
+          status: 'ACTIVE',
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: 'adm-2',
+          admin_code: 'ADM-002',
+          name: 'Rajesh Kumar (Ranchi Admin)',
+          email_or_mobile: 'ranchi@tryathome.in',
+          email: 'ranchi@tryathome.in',
+          mobile: '9835123456',
+          password_pin: '123456',
+          role: 'admin',
+          store_name: 'Ranchi Franchise Store',
+          assigned_pincodes: ['834001', '834002'],
+          status: 'ACTIVE',
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: 'adm-3',
+          admin_code: 'ADM-003',
+          name: 'Ramesh Singh (Garhwa Admin)',
+          email_or_mobile: 'garhwa@tryathome.in',
+          email: 'garhwa@tryathome.in',
+          mobile: '9934123456',
+          password_pin: '123456',
+          role: 'admin',
+          store_name: 'Garhwa Branch Store',
+          assigned_pincodes: ['822114', '822115'],
+          status: 'ACTIVE',
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: 'adm-4',
+          admin_code: 'ADM-004',
+          name: 'Prakash Verma (Patna Admin)',
+          email_or_mobile: 'patna@tryathome.in',
+          email: 'patna@tryathome.in',
+          mobile: '9708123456',
+          password_pin: '123456',
+          role: 'admin',
+          store_name: 'Patna Central Store',
+          assigned_pincodes: ['800001'],
           status: 'ACTIVE',
           created_at: new Date().toISOString(),
         },
       ];
+
+      let modified = false;
+      defaultAdmins.forEach((def) => {
+        if (!list.some((a) => a.id === def.id)) {
+          list.push(def);
+          modified = true;
+          supabaseSaveAdminAccount(def).catch(() => {});
+        }
+      });
+
+      if (modified || !data) {
+        this.setStorageItem(STORAGE_KEYS.ADMIN_ACCOUNTS, JSON.stringify(list));
+      }
+
+      return list;
+    } catch {
+      return [];
     }
   }
 
