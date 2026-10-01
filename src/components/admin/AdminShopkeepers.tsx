@@ -85,12 +85,18 @@ export const AdminShopkeepers: React.FC = () => {
   const [editingShopkeeper, setEditingShopkeeper] = useState<Shopkeeper | null>(null);
 
   // New Shopkeeper Form
+  const activeAdminAccount = db.getCurrentAdmin();
+  const defaultAdminPin = activeAdminAccount?.assigned_pincodes?.[0] || '822114';
+  const defaultAdminCity = activeAdminAccount?.store_name?.includes('Patna') ? 'Patna' :
+                         activeAdminAccount?.store_name?.includes('Ranchi') ? 'Ranchi' :
+                         activeAdminAccount?.store_name?.includes('Garhwa') ? 'Garhwa' : 'Garhwa';
+
   const [newName, setNewName] = useState('');
   const [newStoreName, setNewStoreName] = useState('');
   const [newMobile, setNewMobile] = useState('');
   const [newEmail, setNewEmail] = useState('');
-  const [newCity, setNewCity] = useState('Garhwa');
-  const [newPincode, setNewPincode] = useState('822114');
+  const [newCity, setNewCity] = useState(defaultAdminCity);
+  const [newPincode, setNewPincode] = useState(defaultAdminPin);
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -310,7 +316,8 @@ export const AdminShopkeepers: React.FC = () => {
       setNewStoreName('');
       setNewMobile('');
       setNewEmail('');
-      setNewPincode('822114');
+      setNewPincode(defaultAdminPin);
+      setNewCity(defaultAdminCity);
       setTimeout(() => {
         setIsAddModalOpen(false);
         setFormSuccess('');
@@ -437,6 +444,8 @@ export const AdminShopkeepers: React.FC = () => {
 
         <button
           onClick={() => {
+            setNewPincode(defaultAdminPin);
+            setNewCity(defaultAdminCity);
             setFormError('');
             setFormSuccess('');
             setIsAddModalOpen(true);

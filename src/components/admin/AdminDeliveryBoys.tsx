@@ -105,6 +105,12 @@ export const AdminDeliveryBoys: React.FC = () => {
   };
 
   const handleOpenAdd = () => {
+    const activeAdmin = db.getCurrentAdmin();
+    const pin = activeAdmin?.assigned_pincodes?.[0] || '822114';
+    const city = activeAdmin?.store_name?.includes('Patna') ? 'Patna' :
+                 activeAdmin?.store_name?.includes('Ranchi') ? 'Ranchi' :
+                 activeAdmin?.store_name?.includes('Garhwa') ? 'Garhwa' : 'Garhwa';
+
     setEditingBoy(null);
     setFormData({
       name: '',
@@ -113,8 +119,8 @@ export const AdminDeliveryBoys: React.FC = () => {
       password: 'delivery123',
       vehicle_number: '',
       vehicle_type: 'Motorcycle',
-      city: 'Garhwa',
-      pincode: '822114',
+      city: city,
+      pincode: pin,
       status: 'Active',
     });
     setFormError('');
