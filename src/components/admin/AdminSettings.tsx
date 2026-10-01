@@ -45,22 +45,9 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ onCatalogReset }) 
   const [testMobile, setTestMobile] = useState('');
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [isSendingTest, setIsSendingTest] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<'CAROUSEL' | 'GENERAL' | 'PINCODES' | 'HOSTINGER'>('CAROUSEL');
+  const [settingsTab, setSettingsTab] = useState<'CAROUSEL' | 'GENERAL' | 'PINCODES'>('CAROUSEL');
   const [pincodeInput, setPincodeInput] = useState('');
   const [pincodeMessage, setPincodeMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [isZipping, setIsZipping] = useState(false);
-
-  const handleDownloadFullZip = async () => {
-    setIsZipping(true);
-    try {
-      const { downloadFullProjectZip } = await import('../../utils/downloadProjectZip');
-      await downloadFullProjectZip();
-    } catch (err: any) {
-      alert('Failed to generate project zip: ' + (err?.message || err));
-    } finally {
-      setIsZipping(false);
-    }
-  };
 
   useEffect(() => {
     const handleSync = () => {
@@ -151,68 +138,6 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ onCatalogReset }) 
     }
   };
 
-  const getEnvContentString = () => {
-    const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL || 'https://mjpwgqgc7t6bi7asag5uqa.supabase.co';
-    const supabaseAnonKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qcHdnaHFjN3Q2Ymk3YXNhZzV1cWEiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTczNjQ1NDQwMCwiZXhwIjoyMDUyMDMwNDAwfQ...';
-
-    return `# TRYatHOME Environment Configuration for Hostinger Deployment
-# App & Store Identity
-VITE_APP_TITLE="TRYatHOME - Garment Try at Home"
-VITE_STORE_NAME="TRYatHOME"
-VITE_DEFAULT_PINCODE="822114"
-
-# Supabase Production Database & Realtime Sync
-VITE_SUPABASE_URL="${supabaseUrl}"
-VITE_SUPABASE_ANON_KEY="${supabaseAnonKey}"
-
-# Server Runtime Configuration (For Hostinger VPS / Node Express)
-PORT=3000
-NODE_ENV=production
-`;
-  };
-
-  const handleDownloadEnvFile = () => {
-    const content = getEnvContentString();
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = '.env';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
-
-  const handleDownloadHtaccessFile = () => {
-    const htaccessContent = `<IfModule mod_rewrite.c>
-  RewriteEngine On
-  RewriteBase /
-  RewriteRule ^index\\.html$ - [L]
-  RewriteCond %{REQUEST_FILENAME} !-f
-  RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteCond %{REQUEST_FILENAME} !-l
-  RewriteRule . /index.html [L]
-</IfModule>
-`;
-    const blob = new Blob([htaccessContent], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = '.htaccess';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
-
-  const handleCopyEnvText = () => {
-    const text = getEnvContentString();
-    navigator.clipboard.writeText(text);
-    setEnvCopied(true);
-    setTimeout(() => setEnvCopied(false), 2500);
-  };
-
   const currentAdmin = db.getCurrentAdmin();
   const activeFilter = db.getActiveStoreFilter();
   const isSuperAdmin = currentAdmin?.role === 'super_admin' && (!activeFilter || activeFilter === 'ALL');
@@ -275,144 +200,10 @@ NODE_ENV=production
           <Settings className="w-4 h-4 text-indigo-400" />
           <span>E-Commerce & Store Rules</span>
         </button>
-
-        <button
-          type="button"
-          onClick={() => setSettingsTab('HOSTINGER')}
-          className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 transition-all ${
-            settingsTab === 'HOSTINGER'
-              ? 'bg-purple-900 text-white shadow-xs'
-              : 'bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200'
-          }`}
-        >
-          <Server className="w-4 h-4 text-purple-400" />
-          <span>🚀 HOSTINGER DEPLOYMENT & .ENV</span>
-          <span className="text-[10px] bg-purple-600 text-white font-bold px-1.5 py-0.2 rounded">
-            Export
-          </span>
-        </button>
       </div>
 
       {settingsTab === 'CAROUSEL' ? (
         <AdminHeroCarouselSettings />
-      ) : settingsTab === 'HOSTINGER' ? (
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-2xs space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-100">
-            <div>
-              <h2 className="font-extrabold text-base text-slate-900 flex items-center gap-2">
-                <Server className="w-5 h-5 text-purple-600" />
-                Hostinger Deployment & Environment Config (.env)
-              </h2>
-              <p className="text-xs text-slate-500 mt-1">
-                Download preconfigured environment variables, Apache rewrite rules (.htaccess), and complete deployment steps for Hostinger Web Hosting & VPS.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={handleDownloadFullZip}
-                disabled={isZipping}
-                className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-black text-xs rounded-xl shadow-md inline-flex items-center gap-2 transition-all transform hover:scale-[1.02]"
-              >
-                <Download className={`w-4 h-4 ${isZipping ? 'animate-bounce' : ''}`} />
-                <span>{isZipping ? 'Creating Project ZIP...' : '📦 Download Full Project Source (.zip)'}</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleDownloadEnvFile}
-                className="px-4 py-2 bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200 font-bold text-xs rounded-xl inline-flex items-center gap-2 transition-colors"
-              >
-                <Download className="w-4 h-4 text-purple-600" />
-                <span>Download .env</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleDownloadHtaccessFile}
-                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs rounded-xl shadow-xs inline-flex items-center gap-2 transition-colors"
-              >
-                <FileText className="w-4 h-4 text-amber-400" />
-                <span>Download .htaccess</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Quick Copy Box */}
-          <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-3">
-            <div className="flex items-center justify-between text-xs text-slate-400 font-mono">
-              <span className="flex items-center gap-2 text-purple-400 font-bold">
-                <Terminal className="w-4 h-4" />
-                .env (Hostinger Production Variables)
-              </span>
-              <button
-                type="button"
-                onClick={handleCopyEnvText}
-                className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 transition-colors"
-              >
-                {envCopied ? (
-                  <>
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                    <span className="text-emerald-400">Copied!</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3.5 h-3.5" />
-                    <span>Copy .env Text</span>
-                  </>
-                )}
-              </button>
-            </div>
-            <pre className="text-xs font-mono text-purple-200 bg-slate-900 p-4 rounded-xl overflow-x-auto whitespace-pre leading-relaxed border border-slate-800/80">
-              {getEnvContentString()}
-            </pre>
-          </div>
-
-          {/* Step-by-Step Instructions */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Method A: Hostinger Shared Hosting */}
-            <div className="bg-purple-50/50 border border-purple-200/80 rounded-2xl p-5 space-y-3">
-              <div className="flex items-center gap-2 font-black text-xs text-purple-900">
-                <Globe className="w-4 h-4 text-purple-600" />
-                <span>METHOD 1: Hostinger Web Hosting (cPanel / hPanel)</span>
-              </div>
-              <ol className="text-xs text-purple-950 space-y-2 font-medium list-decimal pl-4">
-                <li>
-                  Run <code className="bg-purple-100 text-purple-900 px-1.5 py-0.5 rounded font-mono font-bold">npm run build</code> locally to create the <code className="bg-purple-100 text-purple-900 px-1.5 py-0.5 rounded font-mono font-bold">dist</code> folder.
-                </li>
-                <li>
-                  Open <strong>Hostinger hPanel &gt; File Manager</strong> and go to <code className="bg-purple-100 text-purple-900 px-1.5 py-0.5 rounded font-mono font-bold">public_html</code>.
-                </li>
-                <li>
-                  Upload all contents from the <code className="bg-purple-100 text-purple-900 px-1.5 py-0.5 rounded font-mono font-bold">dist/</code> folder directly into <code className="bg-purple-100 text-purple-900 px-1.5 py-0.5 rounded font-mono font-bold">public_html</code>.
-                </li>
-                <li>
-                  Upload the downloaded <code className="bg-purple-100 text-purple-900 px-1.5 py-0.5 rounded font-mono font-bold">.htaccess</code> file to <code className="bg-purple-100 text-purple-900 px-1.5 py-0.5 rounded font-mono font-bold">public_html</code> (enables SPA page refreshes).
-                </li>
-              </ol>
-            </div>
-
-            {/* Method B: Hostinger VPS / Node.js Express */}
-            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-3">
-              <div className="flex items-center gap-2 font-black text-xs text-slate-900">
-                <Server className="w-4 h-4 text-indigo-600" />
-                <span>METHOD 2: Hostinger VPS / Node.js Server</span>
-              </div>
-              <ol className="text-xs text-slate-700 space-y-2 font-medium list-decimal pl-4">
-                <li>
-                  Upload project files to your Hostinger VPS directory.
-                </li>
-                <li>
-                  Place the downloaded <code className="bg-slate-200 text-slate-900 px-1.5 py-0.5 rounded font-mono font-bold">.env</code> file in the root folder.
-                </li>
-                <li>
-                  Run <code className="bg-slate-200 text-slate-900 px-1.5 py-0.5 rounded font-mono font-bold">npm install</code> and <code className="bg-slate-200 text-slate-900 px-1.5 py-0.5 rounded font-mono font-bold">npm run build</code>.
-                </li>
-                <li>
-                  Start server with <code className="bg-slate-200 text-slate-900 px-1.5 py-0.5 rounded font-mono font-bold">pm2 start server.ts --name tryathome</code> or <code className="bg-slate-200 text-slate-900 px-1.5 py-0.5 rounded font-mono font-bold">npm start</code>.
-                </li>
-              </ol>
-            </div>
-          </div>
-        </div>
       ) : (settingsTab === 'PINCODES' && isSuperAdmin) ? (
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-2xs space-y-6">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
