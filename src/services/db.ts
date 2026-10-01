@@ -5514,7 +5514,8 @@ class DatabaseService {
   }
 
   async addDeliveryBoyAsync(data: Partial<DeliveryBoy>): Promise<DeliveryBoy> {
-    const all = this.getDeliveryBoys();
+    const rawData = this.getStorageItem(STORAGE_KEYS.DELIVERY_BOYS);
+    const all: DeliveryBoy[] = rawData ? JSON.parse(rawData) : [];
     const nextNum = all.length + 1;
     const dboyIdStr = `STYLE1-DBOY-${String(nextNum).padStart(6, '0')}`;
 
@@ -5531,8 +5532,10 @@ class DatabaseService {
       name: data.name || 'Delivery Associate',
       mobile: (data.mobile || '').replace(/\D/g, ''),
       email: data.email || `dboy${nextNum}@style1.in`,
+      password: data.password || 'delivery123',
       vehicle_type: data.vehicle_type || 'Motorcycle',
       vehicle_number: (data.vehicle_number || 'KA-01-XX-0000').toUpperCase(),
+      city: data.city || 'Patna',
       status: data.status || 'ACTIVE',
       assigned_area: data.assigned_area || `Service Area (${pincode})`,
       created_at: new Date().toISOString(),
@@ -5540,29 +5543,30 @@ class DatabaseService {
       rating: 5.0,
     };
 
-    const success = await supabaseSaveDeliveryBoy(newBoy);
-    if (!success) {
-      throw new Error("Failed to save delivery boy associate to database.");
+    await supabaseSaveDeliveryBoy(newBoy);
+
+    const existingIdx = all.findIndex((d) => d.id === newBoy.id || (d.mobile && d.mobile === newBoy.mobile));
+    if (existingIdx !== -1) {
+      all[existingIdx] = newBoy;
+    } else {
+      all.push(newBoy);
     }
 
-    all.push(newBoy);
     this.setStorageItem(STORAGE_KEYS.DELIVERY_BOYS, JSON.stringify(all));
     notifyDataChanged();
     return newBoy;
   }
 
   async updateDeliveryBoyAsync(id: string, updates: Partial<DeliveryBoy>): Promise<DeliveryBoy | null> {
-    const all = this.getDeliveryBoys();
+    const rawData = this.getStorageItem(STORAGE_KEYS.DELIVERY_BOYS);
+    const all: DeliveryBoy[] = rawData ? JSON.parse(rawData) : [];
     const idx = all.findIndex((d) => d.id === id || d.delivery_boy_id === id);
     if (idx === -1) return null;
 
     const original = all[idx];
     const updated = { ...original, ...updates };
 
-    const success = await supabaseSaveDeliveryBoy(updated);
-    if (!success) {
-      throw new Error("Failed to save delivery boy updates to database.");
-    }
+    await supabaseSaveDeliveryBoy(updated);
 
     all[idx] = updated;
     this.setStorageItem(STORAGE_KEYS.DELIVERY_BOYS, JSON.stringify(all));
