@@ -4,7 +4,7 @@ export async function downloadFullProjectZip(): Promise<void> {
   const zip = new JSZip();
 
   // 1. Raw Glob all source files in src/
-  const srcFiles = import.meta.glob('../src/**/*', { query: '?raw', eager: true });
+  const srcFiles = (import.meta as any).glob('../src/**/*', { query: '?raw', eager: true });
   for (const path in srcFiles) {
     const relativePath = path.replace('../', '');
     const fileContent = (srcFiles[path] as any)?.default || srcFiles[path];

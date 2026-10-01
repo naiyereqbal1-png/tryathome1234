@@ -459,18 +459,7 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </div>
 
-          {/* My Orders Direct Button */}
-          {activeCustomer && (
-            <button
-              id="header-orders-btn"
-              onClick={handleOrdersClick}
-              className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200/80 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 shadow-2xs"
-              title="Track My Orders"
-            >
-              <Package className="w-4 h-4 text-indigo-600 shrink-0" />
-              <span className="hidden sm:inline">My Orders</span>
-            </button>
-          )}
+
 
           {/* Wishlist Icon */}
           <button

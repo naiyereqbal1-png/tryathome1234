@@ -567,6 +567,9 @@ export interface StoreSettings {
   website_logo?: string;
   favicon?: string;
   header_text_color?: string;
+  footer_text_color?: string;
+  button_text_color?: string;
+  border_color?: string;
 
   // Centralized Branding Logos & Images
   logo_website?: string;

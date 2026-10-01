@@ -422,7 +422,21 @@ export const AdminOrderFullDetailModal: React.FC<AdminOrderFullDetailModalProps>
                         <span className="font-bold text-indigo-950">
                           Try at Home Admin Controls:
                         </span>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (confirm('Confirm and Submit Final Bill? This will lock the order across Customer, Admin, and Super Admin.')) {
+                                db.generateFinalBill(order.order_id, 'Admin');
+                                onOrderUpdated();
+                                showToast('Final Bill Confirmed & Locked across all panels!');
+                              }
+                            }}
+                            className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-lg cursor-pointer text-xs shadow-xs flex items-center gap-1.5"
+                          >
+                            <Lock className="w-3.5 h-3.5" />
+                            <span>Confirm & Submit Final Bill</span>
+                          </button>
                           <button
                             type="button"
                             onClick={() => {
@@ -462,6 +476,49 @@ export const AdminOrderFullDetailModal: React.FC<AdminOrderFullDetailModalProps>
                           )}
                         </div>
                       </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Standard COD & Regular Order Billing Controls */}
+                {order.order_type !== 'try_at_home' && order.order_status === 'Delivered' && (
+                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs">
+                    <div>
+                      <p className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
+                        <span>Delivery Status: Delivered</span>
+                        {order.final_bill_locked ? (
+                          <span className="px-2.5 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded font-bold text-[11px] inline-flex items-center gap-1">
+                            <Lock className="w-3 h-3 text-amber-700" />
+                            <span>Final Bill Confirmed & Locked</span>
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-0.5 bg-blue-100 text-blue-900 border border-blue-300 rounded font-bold text-[11px]">
+                            Awaiting Bill Confirmation
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-slate-500 mt-0.5">
+                        {order.final_bill_locked
+                          ? 'This order has been confirmed and locked. Customer and Admin view locked invoice.'
+                          : 'Order delivered. Customer, Admin, or Super Admin can click below to Confirm & Submit Final Bill.'}
+                      </p>
+                    </div>
+
+                    {!order.final_bill_locked && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (confirm('Confirm and Submit Final Bill for this order? This will lock the order across Customer, Admin, and Super Admin.')) {
+                            db.generateFinalBill(order.order_id, 'Admin');
+                            onOrderUpdated();
+                            showToast('Final Bill Confirmed & Locked across all panels!');
+                          }
+                        }}
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Lock className="w-4 h-4" />
+                        <span>Confirm & Submit Final Bill (Lock)</span>
+                      </button>
                     )}
                   </div>
                 )}

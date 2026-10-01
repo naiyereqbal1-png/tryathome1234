@@ -655,7 +655,7 @@ export const OrderInvoiceModal: React.FC<OrderInvoiceModalProps> = ({
                 className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
               >
                 <Lock className="w-3.5 h-3.5" />
-                <span>Generate & Lock Final Bill</span>
+                <span>Confirm & Submit Final Bill (Lock Order)</span>
               </button>
             ) : (
               <div className="flex items-center gap-2 flex-wrap">

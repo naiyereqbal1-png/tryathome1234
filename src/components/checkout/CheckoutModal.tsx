@@ -9,6 +9,7 @@ import {
   Banknote,
   ArrowRight,
   PackageCheck,
+  Package,
   Check,
   Building,
   Smartphone,

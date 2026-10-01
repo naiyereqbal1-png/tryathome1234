@@ -263,18 +263,20 @@ class DatabaseService {
         const existingLocal = mergedOrdersMap.get(key);
 
         if (existingLocal) {
-          const isLockedLocally = existingLocal.final_bill_generated === true || existingLocal.final_bill_locked === true;
-          const isLockedCloud = co.final_bill_generated === true || co.final_bill_locked === true;
-          const finalLocked = isLockedLocally || isLockedCloud;
+          const cloudTime = co.updated_at ? new Date(co.updated_at).getTime() : 0;
+          const localTime = existingLocal.updated_at ? new Date(existingLocal.updated_at).getTime() : 0;
+          const useCloud = cloudTime >= localTime;
+
+          const base = useCloud ? { ...existingLocal, ...co } : { ...co, ...existingLocal };
+          const finalLocked = !!base.final_bill_generated || !!base.final_bill_locked;
 
           const mergedOrder: Order = {
-            ...co,
-            ...existingLocal,
-            order_status: co.order_status || existingLocal.order_status,
+            ...base,
+            order_status: useCloud ? (co.order_status || existingLocal.order_status) : (existingLocal.order_status || co.order_status),
             final_bill_generated: finalLocked,
             final_bill_locked: finalLocked,
-            final_bill_generated_at: existingLocal.final_bill_generated_at || co.final_bill_generated_at,
-            try_at_home_status: finalLocked ? 'CLOSED' : (co.try_at_home_status || existingLocal.try_at_home_status),
+            final_bill_generated_at: base.final_bill_generated_at,
+            try_at_home_status: finalLocked ? 'CLOSED' : (base.try_at_home_status || 'ACTIVE'),
           };
           mergedOrdersMap.set(key, mergedOrder);
         } else {
@@ -3793,7 +3795,7 @@ class DatabaseService {
         email_or_mobile: matched.email_or_mobile || matched.email || matched.mobile,
         mobile: matched.mobile,
         email: matched.email,
-        role: matched.role,
+        role: (matched.role === 'ADMIN' ? 'admin' : matched.role) as any,
         store_name: matched.store_name,
         assigned_pincodes: matched.assigned_pincodes,
         status: matched.status,
@@ -4147,6 +4149,7 @@ class DatabaseService {
         email: 'rahul.sharma@gmail.com',
         address: {
           id: 'addr-1',
+          customer_id: 'cust-1',
           name: 'Rahul Sharma',
           mobile: '9876543210',
           address: 'House No. 42, Main Road, Near Bus Stand',
@@ -4230,6 +4233,7 @@ class DatabaseService {
         email: 'ananya.singh@gmail.com',
         address: {
           id: 'addr-2',
+          customer_id: 'cust-2',
           name: 'Ananya Singh',
           mobile: '9835998877',
           address: 'Flat 302, Royal Residency, Kanke Road',
@@ -4304,6 +4308,7 @@ class DatabaseService {
         email: 'vikram.patel@gmail.com',
         address: {
           id: 'addr-3',
+          customer_id: 'cust-3',
           name: 'Vikram Patel',
           mobile: '9708776655',
           address: 'Boring Road, Near Opposite Mount Carmel',
@@ -4311,7 +4316,7 @@ class DatabaseService {
           city: 'Patna',
           state: 'Bihar',
           pincode: '800001',
-          address_type: 'OFFICE',
+          address_type: 'WORK',
           is_default: true,
         },
         items: [
@@ -4342,6 +4347,8 @@ class DatabaseService {
         payment_status: 'PAID',
         order_status: 'Delivered',
         order_type: 'standard',
+        final_bill_generated: false,
+        final_bill_locked: false,
         assigned_delivery_boy_id: 'dboy-3',
         assigned_delivery_boy_name: 'Suresh Yadav',
         created_at: threeDaysAgoISO,
@@ -4378,6 +4385,7 @@ class DatabaseService {
         email: 'priya.verma@gmail.com',
         address: {
           id: 'addr-4',
+          customer_id: 'cust-4',
           name: 'Priya Verma',
           mobile: '9934887766',
           address: 'Near Town Hall, Ward No. 8',

@@ -31,8 +31,9 @@ export const TryAtHomeCountdown: React.FC<TryAtHomeCountdownProps> = ({
     const info = db.getTryAtHomeTimerInfo(order);
     setTimerInfo(info);
 
-    // If delivered, not yet locked, but already expired: trigger auto-return of all items immediately
+    // For Try at Home orders: If delivered, not yet locked, but trial timer expired -> auto-return unconfirmed items & lock final bill
     if (
+      order.order_type === 'try_at_home' &&
       info.isDelivered &&
       info.isExpired &&
       !order.final_bill_generated &&
@@ -54,8 +55,7 @@ export const TryAtHomeCountdown: React.FC<TryAtHomeCountdownProps> = ({
       const updated = db.getTryAtHomeTimerInfo(order);
       setTimerInfo(updated);
 
-      if (updated.isExpired && !info.isExpired) {
-        // Auto return all items if customer didn't decide within the 30-minute window
+      if (updated.isExpired && !info.isExpired && order.order_type === 'try_at_home') {
         if (!order.final_bill_generated && !order.final_bill_locked && order.try_at_home_status !== 'CLOSED') {
           db.autoReturnAllOrderItems(order.order_id);
         }
