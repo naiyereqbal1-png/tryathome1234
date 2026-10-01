@@ -3944,6 +3944,14 @@ class DatabaseService {
     notifyDataChanged();
   }
 
+  getAdminAuditSignature(fallback = 'Admin'): string {
+    const current = this.getCurrentAdmin();
+    if (!current) return fallback;
+    const pinStr = current.assigned_pincodes && current.assigned_pincodes.length > 0 ? ` [Pin: ${current.assigned_pincodes.join(',')}]` : '';
+    const codeStr = current.admin_code || current.id || 'admin';
+    return `${current.name} (ID: ${codeStr}${pinStr})`;
+  }
+
   // ===================== CART =====================
   private getCartKey(customerId?: string): string {
     return `${STORAGE_KEYS.CART}${customerId || 'guest'}`;
@@ -4926,11 +4934,12 @@ class DatabaseService {
       });
     }
 
+    const auditBy = this.getAdminAuditSignature(changedBy);
     orders[idx].status_history.push({
       id: `sh-${Date.now()}`,
       order_id: orders[idx].order_id,
       status: newStatus,
-      changed_by: changedBy,
+      changed_by: auditBy,
       changed_at: new Date().toISOString(),
       notes,
     });
@@ -4956,7 +4965,7 @@ class DatabaseService {
 
     this.setStorageItem(STORAGE_KEYS.ORDERS, JSON.stringify(orders));
     supabaseSaveOrder(orders[idx]).catch(() => {
-      supabaseUpdateOrderStatus(orders[idx].order_id, newStatus, changedBy, notes).catch(() => {});
+      supabaseUpdateOrderStatus(orders[idx].order_id, newStatus, auditBy, notes).catch(() => {});
     });
     notifyDataChanged();
     return orders[idx];
@@ -4975,13 +4984,14 @@ class DatabaseService {
     const idx = orders.findIndex((o) => o.order_id === orderId || o.id === orderId);
     if (idx === -1) return null;
 
+    const auditBy = this.getAdminAuditSignature(changedBy);
     orders[idx].payment_status = paymentStatus;
     orders[idx].updated_at = new Date().toISOString();
     orders[idx].status_history.push({
       id: `sh-${Date.now()}`,
       order_id: orders[idx].order_id,
       status: orders[idx].order_status,
-      changed_by: changedBy,
+      changed_by: auditBy,
       changed_at: new Date().toISOString(),
       notes: notes || `Payment status updated to ${paymentStatus}`,
     });
@@ -4996,11 +5006,12 @@ class DatabaseService {
     const idx = orders.findIndex((o) => o.order_id === orderId || o.id === orderId);
     if (idx === -1) return null;
 
+    const auditBy = this.getAdminAuditSignature(author);
     orders[idx].status_history.push({
       id: `sh-${Date.now()}`,
       order_id: orders[idx].order_id,
       status: orders[idx].order_status,
-      changed_by: author,
+      changed_by: auditBy,
       changed_at: new Date().toISOString(),
       notes: noteText,
     });
@@ -5038,13 +5049,14 @@ class DatabaseService {
       }
     });
 
+    const auditBy = this.getAdminAuditSignature(cancelledBy);
     order.order_status = 'Cancelled';
     order.updated_at = new Date().toISOString();
     order.status_history.push({
       id: `sh-${Date.now()}`,
       order_id: order.order_id,
       status: 'Cancelled',
-      changed_by: cancelledBy,
+      changed_by: auditBy,
       changed_at: new Date().toISOString(),
       notes: `Entire order cancelled: ${reason}. Inventory restocked.`,
     });
