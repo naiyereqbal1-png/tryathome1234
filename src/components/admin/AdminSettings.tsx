@@ -48,7 +48,19 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ onCatalogReset }) 
   const [settingsTab, setSettingsTab] = useState<'CAROUSEL' | 'GENERAL' | 'PINCODES' | 'HOSTINGER'>('CAROUSEL');
   const [pincodeInput, setPincodeInput] = useState('');
   const [pincodeMessage, setPincodeMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [envCopied, setEnvCopied] = useState(false);
+  const [isZipping, setIsZipping] = useState(false);
+
+  const handleDownloadFullZip = async () => {
+    setIsZipping(true);
+    try {
+      const { downloadFullProjectZip } = await import('../../utils/downloadProjectZip');
+      await downloadFullProjectZip();
+    } catch (err: any) {
+      alert('Failed to generate project zip: ' + (err?.message || err));
+    } finally {
+      setIsZipping(false);
+    }
+  };
 
   useEffect(() => {
     const handleSync = () => {
@@ -298,11 +310,20 @@ NODE_ENV=production
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                onClick={handleDownloadEnvFile}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-black text-xs rounded-xl shadow-xs inline-flex items-center gap-2 transition-colors"
+                onClick={handleDownloadFullZip}
+                disabled={isZipping}
+                className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-black text-xs rounded-xl shadow-md inline-flex items-center gap-2 transition-all transform hover:scale-[1.02]"
               >
-                <Download className="w-4 h-4" />
-                <span>Download .env File</span>
+                <Download className={`w-4 h-4 ${isZipping ? 'animate-bounce' : ''}`} />
+                <span>{isZipping ? 'Creating Project ZIP...' : '📦 Download Full Project Source (.zip)'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleDownloadEnvFile}
+                className="px-4 py-2 bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200 font-bold text-xs rounded-xl inline-flex items-center gap-2 transition-colors"
+              >
+                <Download className="w-4 h-4 text-purple-600" />
+                <span>Download .env</span>
               </button>
               <button
                 type="button"
