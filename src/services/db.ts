@@ -239,10 +239,32 @@ class DatabaseService {
       existingProds.forEach((p) => supabaseSaveProduct(p).catch(() => {}));
     }
     if (cloud.customers) {
-      this.setStorageItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(cloud.customers));
+      const rawLocalCusts = this.getStorageItem(STORAGE_KEYS.CUSTOMERS);
+      let localCusts: Customer[] = rawLocalCusts ? JSON.parse(rawLocalCusts) : [];
+      const mergedCustsMap = new Map<string, Customer>();
+
+      for (const lc of localCusts) {
+        const key = lc.customer_id || lc.id;
+        if (key) mergedCustsMap.set(key, lc);
+      }
+
+      for (const cc of cloud.customers) {
+        const key = cc.customer_id || cc.id;
+        if (!key) continue;
+        const existingLocal = mergedCustsMap.get(key);
+        if (existingLocal) {
+          mergedCustsMap.set(key, { ...existingLocal, ...cc });
+        } else {
+          mergedCustsMap.set(key, cc);
+        }
+      }
+
+      const finalMergedCusts = Array.from(mergedCustsMap.values());
+      this.setStorageItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(finalMergedCusts));
+
       const currentCust = this.getCurrentCustomer();
       if (currentCust) {
-        const matched = cloud.customers.find((c) => c.customer_id === currentCust.customer_id || c.id === currentCust.id);
+        const matched = finalMergedCusts.find((c) => c.customer_id === currentCust.customer_id || c.id === currentCust.id);
         if (matched) {
           this.setCurrentCustomer(matched);
         }
@@ -308,13 +330,39 @@ class DatabaseService {
       });
     }
     if (cloud.deliveryBoys) {
-      this.setStorageItem(STORAGE_KEYS.DELIVERY_BOYS, JSON.stringify(cloud.deliveryBoys));
+      const rawLocalBoys = this.getStorageItem(STORAGE_KEYS.DELIVERY_BOYS);
+      let localBoys: DeliveryBoy[] = rawLocalBoys ? JSON.parse(rawLocalBoys) : [];
+      const mergedBoysMap = new Map<string, DeliveryBoy>();
+
+      for (const lb of localBoys) {
+        const key = lb.id || lb.delivery_boy_id;
+        if (key) mergedBoysMap.set(key, lb);
+      }
+
+      for (const cb of cloud.deliveryBoys) {
+        const key = cb.id || cb.delivery_boy_id;
+        if (!key) continue;
+        const existingLocal = mergedBoysMap.get(key);
+        if (existingLocal) {
+          mergedBoysMap.set(key, { ...existingLocal, ...cb });
+        } else {
+          mergedBoysMap.set(key, cb);
+        }
+      }
+
+      const finalMergedBoys = Array.from(mergedBoysMap.values());
+      this.setStorageItem(STORAGE_KEYS.DELIVERY_BOYS, JSON.stringify(finalMergedBoys));
+
+      // Push all delivery boys to Supabase
+      finalMergedBoys.forEach((boy) => {
+        supabaseSaveDeliveryBoy(boy).catch(() => {});
+      });
 
       // Keep active delivery partner session synchronized
       const currentBoy = this.getCurrentDeliveryBoy();
       if (currentBoy) {
         const cleanMobile = (currentBoy.mobile || '').replace(/\D/g, '');
-        const matched = cloud.deliveryBoys.find(
+        const matched = finalMergedBoys.find(
           (d) =>
             d.id === currentBoy.id ||
             d.delivery_boy_id === currentBoy.delivery_boy_id ||
@@ -326,7 +374,32 @@ class DatabaseService {
       }
     }
     if (cloud.shopkeepers) {
-      this.setStorageItem(STORAGE_KEYS.SHOPKEEPERS, JSON.stringify(cloud.shopkeepers));
+      const rawLocalShops = this.getStorageItem(STORAGE_KEYS.SHOPKEEPERS);
+      let localShops: Shopkeeper[] = rawLocalShops ? JSON.parse(rawLocalShops) : [];
+      const mergedShopsMap = new Map<string, Shopkeeper>();
+
+      for (const ls of localShops) {
+        const key = ls.id || ls.shopkeeper_id;
+        if (key) mergedShopsMap.set(key, ls);
+      }
+
+      for (const cs of cloud.shopkeepers) {
+        const key = cs.id || cs.shopkeeper_id;
+        if (!key) continue;
+        const existingLocal = mergedShopsMap.get(key);
+        if (existingLocal) {
+          mergedShopsMap.set(key, { ...existingLocal, ...cs });
+        } else {
+          mergedShopsMap.set(key, cs);
+        }
+      }
+
+      const finalMergedShops = Array.from(mergedShopsMap.values());
+      this.setStorageItem(STORAGE_KEYS.SHOPKEEPERS, JSON.stringify(finalMergedShops));
+
+      finalMergedShops.forEach((shop) => {
+        supabaseSaveShopkeeper(shop).catch(() => {});
+      });
     }
     if (cloud.returns) {
       this.setStorageItem(STORAGE_KEYS.RETURNS, JSON.stringify(cloud.returns));
