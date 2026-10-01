@@ -1983,15 +1983,12 @@ class DatabaseService {
       const ctx = this.getActiveAdminContext();
       if (!ctx.isSuperMaster && ctx.adminId) {
         const adminAccount = this.getAdmins().find((a) => a.id === ctx.adminId);
-        const storePins = new Set(adminAccount?.assigned_pincodes || ['822114']);
-        const storeNameLower = (adminAccount?.store_name || '').toLowerCase();
+        const storePins = new Set(adminAccount?.assigned_pincodes || []);
 
         list = list.filter((s) => {
           if (s.admin_id === ctx.adminId) return true;
-          if (!s.admin_id) return true;
           if (s.pincode && storePins.has(s.pincode)) return true;
           if (s.pincodes?.some((p) => storePins.has(p))) return true;
-          if (s.city && storeNameLower.includes(s.city.toLowerCase())) return true;
           return false;
         });
       }
@@ -5520,15 +5517,12 @@ class DatabaseService {
       const ctx = this.getActiveAdminContext();
       if (!ctx.isSuperMaster && ctx.adminId) {
         const adminAccount = this.getAdmins().find((a) => a.id === ctx.adminId);
-        const storePins = new Set(adminAccount?.assigned_pincodes || ['822114']);
-        const storeNameLower = (adminAccount?.store_name || '').toLowerCase();
+        const storePins = new Set(adminAccount?.assigned_pincodes || []);
 
         list = list.filter((d) => {
           if (d.admin_id === ctx.adminId) return true;
-          if (!d.admin_id) return true;
           if (d.pincode && storePins.has(d.pincode)) return true;
           if (d.pincodes?.some((p) => storePins.has(p))) return true;
-          if (d.city && storeNameLower.includes(d.city.toLowerCase())) return true;
           return false;
         });
       }
