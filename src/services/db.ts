@@ -344,7 +344,21 @@ class DatabaseService {
         if (!key) continue;
         const existingLocal = mergedBoysMap.get(key);
         if (existingLocal) {
-          mergedBoysMap.set(key, { ...existingLocal, ...cb });
+          const mergedBoy: DeliveryBoy = {
+            ...cb,
+            ...existingLocal,
+            admin_id: cb.admin_id || existingLocal.admin_id,
+            pincode: cb.pincode || existingLocal.pincode,
+            pincodes: (cb.pincodes && cb.pincodes.length > 0) ? cb.pincodes : existingLocal.pincodes,
+            password: cb.password || existingLocal.password,
+            email: cb.email || existingLocal.email,
+            city: cb.city || existingLocal.city,
+            status: cb.status || existingLocal.status,
+            vehicle_type: cb.vehicle_type || existingLocal.vehicle_type,
+            vehicle_number: cb.vehicle_number || existingLocal.vehicle_number,
+            assigned_area: cb.assigned_area || existingLocal.assigned_area,
+          };
+          mergedBoysMap.set(key, mergedBoy);
         } else {
           mergedBoysMap.set(key, cb);
         }
@@ -388,7 +402,19 @@ class DatabaseService {
         if (!key) continue;
         const existingLocal = mergedShopsMap.get(key);
         if (existingLocal) {
-          mergedShopsMap.set(key, { ...existingLocal, ...cs });
+          const mergedShop: Shopkeeper = {
+            ...cs,
+            ...existingLocal,
+            admin_id: cs.admin_id || existingLocal.admin_id,
+            pincode: cs.pincode || existingLocal.pincode,
+            pincodes: (cs.pincodes && cs.pincodes.length > 0) ? cs.pincodes : existingLocal.pincodes,
+            email: cs.email || existingLocal.email,
+            city: cs.city || existingLocal.city,
+            status: cs.status || existingLocal.status,
+            store_name: cs.store_name || existingLocal.store_name,
+            permissions: cs.permissions || existingLocal.permissions,
+          };
+          mergedShopsMap.set(key, mergedShop);
         } else {
           mergedShopsMap.set(key, cs);
         }
@@ -1958,10 +1984,14 @@ class DatabaseService {
       if (!ctx.isSuperMaster && ctx.adminId) {
         const adminAccount = this.getAdmins().find((a) => a.id === ctx.adminId);
         const storePins = new Set(adminAccount?.assigned_pincodes || ['822114']);
+        const storeNameLower = (adminAccount?.store_name || '').toLowerCase();
+
         list = list.filter((s) => {
           if (s.admin_id === ctx.adminId) return true;
+          if (!s.admin_id) return true;
           if (s.pincode && storePins.has(s.pincode)) return true;
           if (s.pincodes?.some((p) => storePins.has(p))) return true;
+          if (s.city && storeNameLower.includes(s.city.toLowerCase())) return true;
           return false;
         });
       }
@@ -1980,7 +2010,8 @@ class DatabaseService {
 
   getShopkeeperByMobile(mobile: string): Shopkeeper | null {
     const cleanMobile = mobile.replace(/\D/g, '').slice(-10);
-    const list = this.getShopkeepers();
+    const raw = this.getStorageItem(STORAGE_KEYS.SHOPKEEPERS);
+    const list: Shopkeeper[] = raw ? JSON.parse(raw) : [];
     return (
       list.find(
         (s) => (s.mobile || '').replace(/\D/g, '').slice(-10) === cleanMobile && s.status === 'ACTIVE'
@@ -1997,6 +2028,7 @@ class DatabaseService {
     pincode?: string;
     pincodes?: string[];
     permissions?: Partial<ShopkeeperPermissions>;
+    admin_id?: string;
   }): Shopkeeper {
     const shopkeepers = this.getShopkeepers();
     const cleanMobile = data.mobile.replace(/\D/g, '').slice(-10);
@@ -2008,9 +2040,10 @@ class DatabaseService {
       throw new Error(`Mobile number +91 ${cleanMobile} is already registered as ${roleCheck.role}.`);
     }
 
-    const pincode = data.pincode || (data.pincodes && data.pincodes[0]) || '822114';
+    const activeAdmin = this.getCurrentAdmin();
+    const pincode = data.pincode || (data.pincodes && data.pincodes[0]) || (activeAdmin?.assigned_pincodes && activeAdmin.assigned_pincodes[0]) || '822114';
     const matchedAdmin = this.findAdminForPincode(pincode);
-    const admin_id = matchedAdmin?.id || this.getCurrentAdmin()?.id || 'adm-1';
+    const admin_id = data.admin_id || activeAdmin?.id || matchedAdmin?.id || 'adm-1';
 
     const existingNums = shopkeepers.map((s) => {
       const match = (s.shopkeeper_id || '').match(/\d+/);
@@ -2109,6 +2142,7 @@ class DatabaseService {
     pincode?: string;
     pincodes?: string[];
     permissions?: Partial<ShopkeeperPermissions>;
+    admin_id?: string;
   }): Promise<Shopkeeper> {
     const shopkeepers = this.getShopkeepers();
     const cleanMobile = data.mobile.replace(/\D/g, '').slice(-10);
@@ -2120,9 +2154,10 @@ class DatabaseService {
       throw new Error(`Mobile number +91 ${cleanMobile} is already registered as ${roleCheck.role}.`);
     }
 
-    const pincode = data.pincode || (data.pincodes && data.pincodes[0]) || '822114';
+    const activeAdmin = this.getCurrentAdmin();
+    const pincode = data.pincode || (data.pincodes && data.pincodes[0]) || (activeAdmin?.assigned_pincodes && activeAdmin.assigned_pincodes[0]) || '822114';
     const matchedAdmin = this.findAdminForPincode(pincode);
-    const admin_id = matchedAdmin?.id || this.getCurrentAdmin()?.id || 'adm-1';
+    const admin_id = data.admin_id || activeAdmin?.id || matchedAdmin?.id || 'adm-1';
 
     const existingNums = shopkeepers.map((s) => {
       const match = (s.shopkeeper_id || '').match(/\d+/);
@@ -5486,10 +5521,14 @@ class DatabaseService {
       if (!ctx.isSuperMaster && ctx.adminId) {
         const adminAccount = this.getAdmins().find((a) => a.id === ctx.adminId);
         const storePins = new Set(adminAccount?.assigned_pincodes || ['822114']);
+        const storeNameLower = (adminAccount?.store_name || '').toLowerCase();
+
         list = list.filter((d) => {
           if (d.admin_id === ctx.adminId) return true;
+          if (!d.admin_id) return true;
           if (d.pincode && storePins.has(d.pincode)) return true;
           if (d.pincodes?.some((p) => storePins.has(p))) return true;
+          if (d.city && storeNameLower.includes(d.city.toLowerCase())) return true;
           return false;
         });
       }
@@ -5520,13 +5559,15 @@ class DatabaseService {
   }
 
   addDeliveryBoy(data: Partial<DeliveryBoy>): DeliveryBoy {
-    const all = this.getDeliveryBoys();
+    const rawData = this.getStorageItem(STORAGE_KEYS.DELIVERY_BOYS);
+    const all: DeliveryBoy[] = rawData ? JSON.parse(rawData) : [];
     const nextNum = all.length + 1;
     const dboyIdStr = `STYLE1-DBOY-${String(nextNum).padStart(6, '0')}`;
 
-    const pincode = data.pincode || (data.pincodes && data.pincodes[0]) || '822114';
+    const activeAdmin = this.getCurrentAdmin();
+    const pincode = data.pincode || (data.pincodes && data.pincodes[0]) || (activeAdmin?.assigned_pincodes && activeAdmin.assigned_pincodes[0]) || '822114';
     const matchedAdmin = this.findAdminForPincode(pincode);
-    const admin_id = data.admin_id || matchedAdmin?.id || this.getCurrentAdmin()?.id || 'adm-1';
+    const admin_id = data.admin_id || activeAdmin?.id || matchedAdmin?.id || 'adm-1';
 
     const newBoy: DeliveryBoy = {
       id: `dboy-${Date.now()}`,
@@ -5537,8 +5578,10 @@ class DatabaseService {
       name: data.name || 'Delivery Associate',
       mobile: (data.mobile || '').replace(/\D/g, ''),
       email: data.email || `dboy${nextNum}@style1.in`,
+      password: data.password || 'delivery123',
       vehicle_type: data.vehicle_type || 'Motorcycle',
       vehicle_number: (data.vehicle_number || 'KA-01-XX-0000').toUpperCase(),
+      city: data.city || 'Patna',
       status: data.status || 'ACTIVE',
       assigned_area: data.assigned_area || `Service Area (${pincode})`,
       created_at: new Date().toISOString(),
@@ -5592,9 +5635,10 @@ class DatabaseService {
     const nextNum = all.length + 1;
     const dboyIdStr = `STYLE1-DBOY-${String(nextNum).padStart(6, '0')}`;
 
-    const pincode = data.pincode || (data.pincodes && data.pincodes[0]) || '822114';
+    const activeAdmin = this.getCurrentAdmin();
+    const pincode = data.pincode || (data.pincodes && data.pincodes[0]) || (activeAdmin?.assigned_pincodes && activeAdmin.assigned_pincodes[0]) || '822114';
     const matchedAdmin = this.findAdminForPincode(pincode);
-    const admin_id = data.admin_id || matchedAdmin?.id || this.getCurrentAdmin()?.id || 'adm-1';
+    const admin_id = data.admin_id || activeAdmin?.id || matchedAdmin?.id || 'adm-1';
 
     const newBoy: DeliveryBoy = {
       id: `dboy-${Date.now()}`,
